@@ -1,5 +1,6 @@
 package ru.network.anonymizer_msgs.util;
 
+import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
@@ -10,6 +11,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import java.util.*;
 import java.util.concurrent.*;
 
+@Component
 public class MediaGroupBuffer {
 
     private final TelegramClient telegramClient;

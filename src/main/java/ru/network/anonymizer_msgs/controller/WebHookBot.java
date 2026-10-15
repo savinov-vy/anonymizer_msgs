@@ -4,12 +4,12 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.service.MafiaGameService;
+import ru.network.anonymizer_msgs.service.SenderService;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -20,11 +20,14 @@ public class WebHookBot {
     private final TelegramClient telegramClient;
     private final MediaGroupBuffer mediaGroupBuffer;
     private final MafiaGameService gameService;
+    private final SenderService senderService;
 
-    public WebHookBot(TelegramClient telegramClient, MafiaGameService gameService) {
+    public WebHookBot(TelegramClient telegramClient, MafiaGameService gameService,
+                      SenderService senderService) {
         this.telegramClient = telegramClient;
         this.gameService = gameService;
         this.mediaGroupBuffer = new MediaGroupBuffer(telegramClient);
+        this.senderService = senderService;
 
         // Настраиваем мост уведомлений: когда сервис меняет фазу или раздает роли,
         // бот автоматически рассылает сообщения нужным игрокам
@@ -35,9 +38,7 @@ public class WebHookBot {
 
             if (target.equals("ALL")) {
                 // Рассылка вообще всем участникам лобби
-                for (Player p : gameService.getAllPlayers()) {
-                    sendSystemMessage(p.getId(), text);
-                }
+                senderService.sendMafiaMessage(text);
             } else {
                 // Персональное сообщение конкретному игроку (например, его роль)
                 sendSystemMessage(target, text);
@@ -55,21 +56,21 @@ public class WebHookBot {
 
             String chatId = message.getChatId().toString();
 
+            // обработка регистрации
+            if (message.hasText() && !gameService.isPlayersFull()) {
+                try {
+                    String userid = extractUserId(update);
+                    String firstName = message.getFrom().getFirstName();
+                    gameService.registerPlayer(userid, firstName);
+                } catch (IllegalStateException e) {
+                    senderService.sendMafiaMessage("⚠️ " + e.getMessage());
+                }
+                return null;
+            }
+
+            // Логика отправки секретных сообщений в чат мафии
             if (message.getChat().isUserChat()) {
                 String text = message.getText();
-
-                // Перехватываем команду /start
-                if (text != null && text.startsWith("/start")) {
-                    try {
-                        String firstName = message.getFrom().getFirstName();
-                        gameService.registerPlayer(chatId, firstName);
-                    } catch (IllegalStateException e) {
-                        sendSystemMessage(chatId, "⚠️ " + e.getMessage());
-                    }
-                    return null;
-                }
-
-                // Логика отправки секретных сообщений в чат мафии
                 try {
                     gameService.sendMafiaChatMessage(chatId, text);
                     broadcastToMafia(chatId, message.getMessageId());
@@ -89,27 +90,8 @@ public class WebHookBot {
 
             // Стандартное одиночное зеркалирование анонимайзера для мирных жителей
             Integer messageId = message.getMessageId();
-            Integer threadId = message.getMessageThreadId();
+            senderService.sendMafiaMessage(messageId);
 
-            CompletableFuture.runAsync(() -> {
-                try {
-                    CopyMessage copyMessage = CopyMessage.builder()
-                            .fromChatId(chatId)
-                            .messageId(messageId)
-                            .chatId(chatId)
-                            .messageThreadId(threadId)
-                            .build();
-                    telegramClient.execute(copyMessage);
-
-                    DeleteMessage deleteMessage = DeleteMessage.builder()
-                            .chatId(chatId)
-                            .messageId(messageId)
-                            .build();
-                    telegramClient.execute(deleteMessage);
-                } catch (Exception e) {
-                    System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
-                }
-            });
         }
         return null;
     }
@@ -148,5 +130,26 @@ public class WebHookBot {
         } catch (Exception e) {
             System.err.println("Ошибка отправки системного сообщения: " + e.getMessage());
         }
+    }
+
+    private String extractUserId(Update update) {
+        org.telegram.telegrambots.meta.api.objects.User from = null;
+
+        if (update.hasMessage()) {
+            from = update.getMessage().getFrom();
+        } else if (update.hasCallbackQuery()) {
+            from = update.getCallbackQuery().getFrom();
+        } else if (update.getMyChatMember() != null) {
+            from = update.getMyChatMember().getFrom();
+        }
+
+        if (from != null) {
+            return String.valueOf(from.getId());
+        }
+
+        if (update.hasMessage()) {
+            return String.valueOf(update.getMessage().getChatId());
+        }
+        return null;
     }
 }

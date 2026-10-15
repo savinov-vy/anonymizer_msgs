@@ -18,6 +18,7 @@ public class MafiaGameService {
     private GamePhase currentPhase = GamePhase.FIRST_NIGHT;
     private final List<String> mafiaChatLog = new ArrayList<>();
     private final ThreadPoolTaskScheduler taskScheduler;
+    private SenderService senderService;
 
     // Слушатель для уведомления бота о событиях (смена фазы, старт игры)
     private Consumer<String> gameNotificationListener;
@@ -38,7 +39,7 @@ public class MafiaGameService {
         if (players.containsKey(id)) {
             throw new IllegalStateException("Вы уже зарегистрированы в игре!");
         }
-        if (players.size() >= 10) {
+        if (isPlayersFull()) {
             throw new IllegalStateException("Извините, лобби уже заполнено (10/10).");
         }
 
@@ -47,7 +48,7 @@ public class MafiaGameService {
 
         notifyAllAsync("Игрок " + name + " присоединился! Всего игроков: " + players.size() + "/10");
 
-        if (players.size() == 4) {
+        if (isPlayersFull()) {
             startFirstNight();
             return true;
         }
@@ -123,7 +124,9 @@ public class MafiaGameService {
     // Все остальные методы (sendMafiaChatMessage, getPlayer, getAllPlayers) остаются без изменений
     public void sendMafiaChatMessage(String playerId, String message) {
         Player player = players.get(playerId);
-        if (player == null || !player.isAlive()) throw new IllegalStateException("Игрок не найден или выбыл.");
+        if (player == null || !player.isAlive()) {
+            throw new IllegalStateException("Игрок не найден или выбыл.");
+        }
         if (player.getRole() == null || !player.getRole().isBlack()) throw new SecurityException("Вы не в мафии!");
 
         switch (currentPhase) {
@@ -133,7 +136,19 @@ public class MafiaGameService {
         }
     }
 
-    public Player getPlayer(String id) { return players.get(id); }
-    public List<Player> getAllPlayers() { return new ArrayList<>(players.values()); }
-    private void logMessage(String senderName, String message) { mafiaChatLog.add(senderName + ": " + message); }
+    public boolean isPlayersFull() {
+        return getAllPlayers().size() >= 4;
+    }
+
+    public Player getPlayer(String id) {
+        return players.get(id);
+    }
+
+    public List<Player> getAllPlayers() {
+        return new ArrayList<>(players.values());
+    }
+
+    private void logMessage(String senderName, String message) {
+        mafiaChatLog.add(senderName + ": " + message);
+    }
 }

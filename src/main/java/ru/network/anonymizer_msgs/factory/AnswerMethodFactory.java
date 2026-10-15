@@ -39,6 +39,21 @@ public class AnswerMethodFactory {
     }
 
     /**
+     * SendMessage - метод для отправки сообщения в топик чата
+     */
+    public static SendMessage getSendMessage(Long chatId, Integer topicId, String text, ReplyKeyboardMarkup keyboard) {
+        return SendMessage.builder()
+                .chatId(String.valueOf(chatId))
+                .messageThreadId(topicId)
+                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
+                .replyMarkup(keyboard)
+                .disableNotification(true)
+                .disableWebPagePreview(true)
+                .protectContent(true)
+                .build();
+    }
+
+    /**
      * SendMessage - метод для отправки сообщения ботом пользователю
      */
     public static SendMessage getHTMLSendMessage(Long chatId, String text, ReplyKeyboardMarkup keyboard) {

@@ -5,10 +5,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
@@ -16,6 +18,7 @@ import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 
 @Service
@@ -25,10 +28,68 @@ public class SenderService implements AdminNotifier {
 
     TelegramClient telegramClient;
 
+    private static final Long CHAT_ID = -1004434014698L;
+    private static final Integer TOPIC_MAFIA_ID = 5;
+
     public void sentMessage(String text, Long chatId) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getSendMessage(chatId, text, null);
         sendNow(sendMessage);
+    }
+
+    public void sendMafiaMessage(String text) {
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
+        sendNow(sendMessage);
+    }
+
+    public void sendMafiaMessage(String text, Integer messageId) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                CopyMessage copyMessage = CopyMessage.builder()
+                        .fromChatId(CHAT_ID)
+                        .messageId(messageId)
+                        .chatId(CHAT_ID)
+                        .messageThreadId(TOPIC_MAFIA_ID)
+                        .disableNotification(true)
+                        .build();
+                sendNow(copyMessage);
+
+                DeleteMessage deleteMessage = DeleteMessage.builder()
+                        .chatId(CHAT_ID)
+                        .messageId(messageId)
+                        .build();
+                sendNow(deleteMessage);
+
+            } catch (Exception e) {
+                System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
+            }
+        });
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
+        sendNow(sendMessage);
+    }
+
+    public void sendMafiaMessage(Integer messageId) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                CopyMessage copyMessage = CopyMessage.builder()
+                        .fromChatId(CHAT_ID)
+                        .messageId(messageId)
+                        .chatId(CHAT_ID)
+                        .disableNotification(true)
+                        .messageThreadId(TOPIC_MAFIA_ID)
+                        .build();
+                sendNow(copyMessage);
+
+                DeleteMessage deleteMessage = DeleteMessage.builder()
+                        .chatId(CHAT_ID)
+                        .messageId(messageId)
+                        .build();
+                sendNow(deleteMessage);
+            } catch (Exception e) {
+                System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
+            }
+        });
+
     }
 
     public void sendHTMLMessage(String text, Long chatId) {

@@ -47,7 +47,7 @@ public class MafiaGameService {
 
         notifyAllAsync("Игрок " + name + " присоединился! Всего игроков: " + players.size() + "/10");
 
-        if (players.size() == 10) {
+        if (players.size() == 4) {
             startFirstNight();
             return true;
         }
@@ -90,11 +90,17 @@ public class MafiaGameService {
         this.currentPhase = newPhase;
 
         if (newPhase == GamePhase.DAY) {
-            notifyAllAsync("☀️ Наступил ДЕНЬ! Город просыпается. Мафия переходит в режим скрытого обсуждения.");
-        } else if (newPhase == GamePhase.NIGHT) {
-            notifyAllAsync("🌙 Наступила НОЧЬ! Чат мафии строго заблокирован. Время ночных действий.");
+            notifyAllAsync("☀️ Наступил ДЕНЬ! Город просыпается.");
 
-            // Таймер ночи на 45 секунд
+            // ДОБАВИТЬ: Через 3 минуты день автоматически закроется и наступит ночь
+            taskScheduler.schedule(
+                    () -> changePhase(GamePhase.NIGHT),
+                    Instant.now().plusSeconds(180)
+            );
+
+        } else if (newPhase == GamePhase.NIGHT) {
+            notifyAllAsync("🌙 Наступила НОЧЬ! Чат мафии заблокирован.");
+
             taskScheduler.schedule(
                     () -> changePhase(GamePhase.DAY),
                     Instant.now().plusSeconds(45)

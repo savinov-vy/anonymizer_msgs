@@ -38,8 +38,8 @@
 		<!-- ЗАМЕНЕНО: Стартер для работы через Webhook вместо Long Polling -->
 		<dependency>
 			<groupId>org.telegram</groupId>
-			<artifactId>telegrambots-springboot-webhook-starter</artifactId>
-			<version>10.2.0</version>
+			<artifactId>telegrambots-springboot-longpolling-starter</artifactId>
+			<version>10.2.0</version> <!-- Или ваша текущая версия библиотеки telegrambots -->
 		</dependency>
 		<dependency>
 			<groupId>org.telegram</groupId>

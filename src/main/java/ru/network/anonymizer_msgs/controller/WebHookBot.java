@@ -10,7 +10,6 @@ import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.service.MafiaGameService;
-import ru.network.anonymizer_msgs.util.MediaGroupBuffer;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;

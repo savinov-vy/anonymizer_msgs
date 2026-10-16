@@ -4,29 +4,14 @@ package ru.network.anonymizer_msgs.service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.checkerframework.checker.units.qual.N;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.telegram.telegrambots.meta.api.methods.CopyMessage;
-import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
-import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.meta.generics.TelegramClient;
-import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
-import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.type.GamePhase;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -68,6 +53,26 @@ public class GamePhaserService {
             "💀 Жертва мафии: %s.\n\n" +
             "Город, ваше слово. Обсуждаем и голосуем кто виноват. Выбор кнопками.";
 
+    private static final String ONE_SUICIDE_NIGHT_MSG = "\uD83D\uDD6F\uFE0F Ночь забрала душу.\n" +
+            "Пока город спал, %s в одиночестве принял(-а) роковое решение. " +
+            "Утром тело нашли без признаков борьбы — это было самоубийство.\n" +
+            "Тишина повисла над улицами...\n";
+
+    private static final String MANY_SUICIDE_NIGHT_MSG = "\uD83C\uDF19 Ночь опустилась на город...\n" +
+            "Этой ночью несколько из жителей не смогли справиться с отчаянием и свёли счёты с жизнью.\n" +
+            "%s найдены мёртвыми на рассвете. Причина — самоубийство.\n" +
+            "Город в шоке. Кто следующий?";
+
+    private static final String ONE_SUICIDE_DAY_MSG = "\u2600\uFE0F День не принёс облегчения.\n" +
+            "Среди бела дня %s в одиночестве принял(-а) роковое решение. " +
+            "Тело нашли без признаков борьбы — это было самоубийство.\n" +
+            "Город замер в молчании...\n";
+
+    private static final String MANY_SUICIDE_DAY_MSG = "\uD83C\uDF24\uFE0F День омрачил город...\n" +
+            "Сегодня несколько из жителей не смогли справиться с отчаянием и свели счёты с жизнью.\n" +
+            "%s найдены мёртвыми. Причина — самоубийство.\n" +
+            "Город в шоке. Кто следующий?";
+
     private static final String MAFIA_WIN = "\uD83C\uDFA9 МАФИЯ ВЫИГРАЛА!\n\n%s";
     private static final String CIVILIAN_WIN = "\uD83D\uDC64 ЖИТЕЛИ ВЫИГРАЛИ!\n\n%s";
 
@@ -92,10 +97,10 @@ public class GamePhaserService {
                 String donName = playerRepository.findDon().getName();
                 List<Player> mafia = playerRepository.findMafia();
                 List<Player> redPlayers = playerRepository.findRedPlayers();
-                List<Player> blackPlayers = playerRepository.findBlackPlayers();
+                List<Player> blackPlayers = playerRepository.findAliveBlackPlayers();
 
                 senderService.sendNowPrivate(String.format(PRIVATE_FIRST_NIGHT_MSG, donName,
-                        names(mafia), names(redPlayers)),blackPlayers);
+                        names(mafia), names(redPlayers)), blackPlayers);
                 senderService.sendMafiaMessage(String.format(FIRST_NIGHT_MSG, SECOND_60)).orElse(null);
                 lastMessageId.set(messageId);
             } else {
@@ -126,6 +131,18 @@ public class GamePhaserService {
                 int second = timer.decrementAndGet();
                 senderService.editMafiaMessage(String.format(NIGHT_MSG, second), lastMessageId.get())
                         .orElse(null);
+                if (timer.get() <= 0) {
+                    List<Player> suicides = playerRepository.getSuicides(FIRST_DAY);
+                    suicides.stream()
+                            .map(Player::getId)
+                            .forEach(playerRepository::kill);
+                    String names = names(suicides);
+                    if (suicides != null && suicides.size() == 1) {
+                        senderService.sendMafiaMessage(String.format(ONE_SUICIDE_NIGHT_MSG, names));
+                    } else if (suicides != null && suicides.size() > 1) {
+                        senderService.sendMafiaMessage(String.format(MANY_SUICIDE_NIGHT_MSG, names));
+                    }
+                }
                 checkChangePhase();
             }
         } else if (currentPhase == DON_SHERIFF_NIGHT) {
@@ -150,6 +167,18 @@ public class GamePhaserService {
                 int second = timer.decrementAndGet();
                 senderService.editMafiaMessage(String.format(DAY_MSG, second), lastMessageId.get())
                         .orElse(null);
+                if (timer.get() <= 0) {
+                    List<Player> suicides = playerRepository.getSuicides(DAY);
+                    suicides.stream()
+                            .map(Player::getId)
+                            .forEach(playerRepository::kill);
+                    String names = names(suicides);
+                    if (suicides != null && suicides.size() == 1) {
+                        senderService.sendMafiaMessage(String.format(ONE_SUICIDE_DAY_MSG, names));
+                    } else if (suicides != null && suicides.size() > 1) {
+                        senderService.sendMafiaMessage(String.format(MANY_SUICIDE_DAY_MSG, names));
+                    }
+                }
                 checkChangePhase();
             }
         } else if (currentPhase == FINISHED) {
@@ -177,6 +206,9 @@ public class GamePhaserService {
     }
 
     private String names(List<Player> players) {
+        if (players == null || players.size() == 0) {
+            return "";
+        }
         return players.stream()
                 .map(Player::getName)
                 .collect(Collectors.joining(", "));

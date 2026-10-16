@@ -4,9 +4,11 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import ru.network.anonymizer_msgs.handler.NightHandler;
 import ru.network.anonymizer_msgs.model.AddPlayerModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.type.ActionType;
+import ru.network.anonymizer_msgs.type.GamePhase;
 import ru.network.anonymizer_msgs.type.Role;
 import ru.network.anonymizer_msgs.utils.NamesUtils;
 
@@ -14,7 +16,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,32 @@ public class PlayerRepository {
     public void clear() {
         players.clear();
         //todo тут нужно дернуть Love38Bot чтобы перевести игроков в консистентное состояние
+    }
+
+    public List<Player> getSuicides(GamePhase gamePhase) {
+        if (gamePhase == GamePhase.NIGHT) {
+            Set<Long> blackUsers = findAliveBlackPlayers().stream().map(Player::getId).collect(Collectors.toSet());
+            Set<Long> shooters = NightHandler.shooterIdTargetId.keySet();
+
+            Set<Long> notShooters = findAliveBlackPlayers().stream()
+                    .map(Player::getId)
+                    .filter(id -> !shooters.contains(id))
+                    .collect(Collectors.toSet());
+            if (notShooters.isEmpty()) {
+                return List.of();
+            }
+
+            return notShooters.stream()
+                    .map(players::get)
+                    .toList();
+        } else if (gamePhase == GamePhase.DAY) {
+
+        }
+    }
+
+    public void kill(Long id) {
+        Player player = players.get(id);
+        player.setAlive(false);
     }
 
     public boolean contains(Long id) {
@@ -69,7 +99,7 @@ public class PlayerRepository {
         return red > black;
     }
 
-    public List<Player> findBlackPlayers() {
+    public List<Player> findAliveBlackPlayers() {
         return getAll().stream()
                 .filter(p -> p.isAlive()
                         && (p.getRole() == Role.MAFIA || p.getRole() == Role.DON))

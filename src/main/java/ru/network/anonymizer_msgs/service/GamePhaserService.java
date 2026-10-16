@@ -10,7 +10,10 @@ import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.type.GamePhase;
+import ru.network.anonymizer_msgs.type.Role;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -92,7 +95,7 @@ public class GamePhaserService {
 
         Integer messageId = null;
         if (currentPhase == GamePhase.FIRST_NIGHT) {
-            if (timer.get() < -50) {
+            if (isFirstTakt()) {
                 setTimer(SECOND_60);
                 String donName = playerRepository.findDon().getName();
                 List<Player> mafia = playerRepository.findMafia();
@@ -261,8 +264,29 @@ public class GamePhaserService {
      * Автоматический запуск игры при наборе 10 человек
      */
     public void startFirstNight() {
-        currentPhase = GamePhase.FIRST_NIGHT;
+        playerRepository.setActionType(ActionType.FIRST_NIGHT);
+        setRandomRoles();
         setTimer(-100);
+        currentPhase = GamePhase.FIRST_NIGHT;
+    }
+
+    public void setRandomRoles() {
+        // 1. Формируем пул из 10 спортивных ролей
+        List<Role> rolePool = new ArrayList<>(List.of(
+                Role.DON, Role.MAFIA, Role.MAFIA, // 3 черных
+                Role.SHERIFF,                     // 1 шериф
+                Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN // 6 мирных
+        ));
+        Collections.shuffle(rolePool);
+
+        // 2. Раздаем роли игрокам в карте
+        int i = 0;
+        List<Player> players = playerRepository.getAll();
+        for (Player player : players) {
+            player.setRole(rolePool.get(i++));
+            // Персонально уведомляем игрока о его роли
+            senderService.sendNowPrivate( "🎮 Игра началась! Ваша секретная роль: " + player.getRole().name(), player.getId());
+        }
     }
 
     /**

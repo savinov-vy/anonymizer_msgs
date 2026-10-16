@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -22,7 +23,6 @@ import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
 import java.io.Serializable;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -77,10 +77,6 @@ public class SenderService implements AdminNotifier {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessage(chatId, text, keyboardMarkup);
         return execute(() -> telegramClient.execute(sendMessage))
                 .map(Message::getMessageId);
-    }
-
-    public <T> void sendNow(Method method) {
-        execute(() -> telegramClient.execute(method));
     }
 
     public Optional<Integer> sendHTMLMessage(String text, Long chatId) {
@@ -184,6 +180,7 @@ public class SenderService implements AdminNotifier {
 
     /**
      * Отправляет текст пользователю и возвращает messageId.
+     * отправка прямо в личку в Love38Bot
      */
     public Optional<Integer> sendNowPrivate(String text, Long toUserId) {
         SendMessage message = AnswerMethodFactory.getSendMessage(toUserId, text, null);
@@ -282,6 +279,14 @@ public class SenderService implements AdminNotifier {
 
 
     public void deleteMessage(DeleteMessage deleteMessage) {
+        executeGeneric(deleteMessage);
+    }
+
+    public void deleteMessage(Update update) {
+        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
+        if (deleteMessage == null) {
+            return;
+        }
         executeGeneric(deleteMessage);
     }
     // ================== execute ==================

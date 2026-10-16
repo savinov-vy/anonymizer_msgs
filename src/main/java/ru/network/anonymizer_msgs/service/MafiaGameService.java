@@ -28,25 +28,6 @@ public class MafiaGameService {
     private final Consumer<String> gameNotificationListener;
 
 
-    public void setRandomRoles() {
-        // 1. Формируем пул из 10 спортивных ролей
-        List<Role> rolePool = new ArrayList<>(List.of(
-                Role.DON, Role.MAFIA, Role.MAFIA, // 3 черных
-                Role.SHERIFF,                     // 1 шериф
-                Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN // 6 мирных
-        ));
-        Collections.shuffle(rolePool);
-
-        // 2. Раздаем роли игрокам в карте
-        int i = 0;
-        List<Player> players = playerRepository.getAll();
-        for (Player player : players) {
-            player.setRole(rolePool.get(i++));
-            // Персонально уведомляем игрока о его роли
-            senderService.sendNowPrivate( "🎮 Игра началась! Ваша секретная роль: " + player.getRole().name(), player.getId());
-        }
-    }
-
     private void notifyAllAsync(String message) {
         if (gameNotificationListener != null) {
             gameNotificationListener.accept("ALL:" + message);

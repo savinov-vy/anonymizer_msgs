@@ -21,10 +21,6 @@ public class FirstDayHandler extends MessageHandler {
         }
     }
 
-    public void activateHandler(Player player) {
-
-    }
-
     public ActionType getHandlerType(){
         return ActionType.FIRST_DAY;
     }

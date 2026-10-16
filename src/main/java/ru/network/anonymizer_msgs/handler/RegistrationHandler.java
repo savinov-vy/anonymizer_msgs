@@ -27,10 +27,6 @@ public class RegistrationHandler extends MessageHandler {
 //        return false;
     }
 
-    public void activateHandler(Player player) {
-
-    }
-
     public ActionType getHandlerType(){
         return ActionType.REGISTERED;
     }

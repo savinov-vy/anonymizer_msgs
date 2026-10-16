@@ -24,10 +24,6 @@ public class FirstNightHandler extends MessageHandler {
         }
     }
 
-    public void activateHandler(Player player) {
-
-    }
-
     public ActionType getHandlerType(){
         return ActionType.FIRST_NIGHT;
     }

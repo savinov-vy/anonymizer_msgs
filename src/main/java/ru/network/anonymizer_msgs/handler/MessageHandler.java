@@ -31,8 +31,6 @@ public abstract class MessageHandler {
 
     public abstract void execute(Update update, Player currentPlayer);
 
-    public abstract void activateHandler(Player player);
-
     public abstract ActionType getHandlerType();
 
     protected String getMessage(Update update) {
@@ -82,6 +80,14 @@ public abstract class MessageHandler {
     }
 
     protected void deleteMessage(DeleteMessage deleteMessage) {
+        senderService.deleteMessage(deleteMessage);
+    }
+
+    protected void deleteMessage(Update update) {
+        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
+        if (deleteMessage == null) {
+            return;
+        }
         senderService.deleteMessage(deleteMessage);
     }
 

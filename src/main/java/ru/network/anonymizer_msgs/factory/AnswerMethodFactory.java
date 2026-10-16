@@ -10,6 +10,7 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
+import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaVideo;
@@ -20,6 +21,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRem
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -241,6 +243,25 @@ public class AnswerMethodFactory {
      * DeleteMessage - метод для удаления конкретного сообщения
      */
     public static DeleteMessage getDeleteMessage(Long chatId, Integer messageId) {
+        return DeleteMessage.builder()
+                .chatId(String.valueOf(chatId))
+                .messageId(messageId)
+                .build();
+    }
+
+    /**
+     * DeleteMessage - метод для удаления конкретного сообщения
+     */
+    public static DeleteMessage getDeleteMessage(Update update) {
+        if (!update.hasMessage()) {
+            return null;
+        }
+        Integer messageId = update.getMessage().getMessageId();
+        Long chatId = update.getMessage().getChatId();
+
+        if (messageId == null || chatId == chatId) {
+            return null;
+        }
         return DeleteMessage.builder()
                 .chatId(String.valueOf(chatId))
                 .messageId(messageId)

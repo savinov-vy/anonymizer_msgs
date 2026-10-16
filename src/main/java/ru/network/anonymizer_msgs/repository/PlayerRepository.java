@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import ru.network.anonymizer_msgs.handler.DayHandler;
 import ru.network.anonymizer_msgs.handler.NightHandler;
 import ru.network.anonymizer_msgs.model.AddPlayerModel;
 import ru.network.anonymizer_msgs.model.Player;
@@ -36,10 +37,9 @@ public class PlayerRepository {
 
     public List<Player> getSuicides(GamePhase gamePhase) {
         if (gamePhase == GamePhase.NIGHT) {
-            Set<Long> blackUsers = findAliveBlackPlayers().stream().map(Player::getId).collect(Collectors.toSet());
             Set<Long> shooters = NightHandler.shooterIdTargetId.keySet();
-
             Set<Long> notShooters = findAliveBlackPlayers().stream()
+                    .filter(Player::isAlive)
                     .map(Player::getId)
                     .filter(id -> !shooters.contains(id))
                     .collect(Collectors.toSet());
@@ -51,8 +51,20 @@ public class PlayerRepository {
                     .map(players::get)
                     .toList();
         } else if (gamePhase == GamePhase.DAY) {
-
+            Set<Long> voters = DayHandler.voterIdTargetId.keySet();
+            Set<Long> notVoters = players.values().stream()
+                    .filter(Player::isAlive)
+                    .map(Player::getId)
+                    .filter(id -> !voters.contains(id))
+                    .collect(Collectors.toSet());
+            if (notVoters.isEmpty()) {
+                return List.of();
+            }
+            return notVoters.stream()
+                    .map(players::get)
+                    .toList();
         }
+        return List.of();
     }
 
     public void kill(Long id) {
@@ -153,7 +165,7 @@ public class PlayerRepository {
                 .toList();
     }
 
-    public AddPlayerModel addPlayer(Long userId) {
+    public AddPlayerModel getOrCreatePlayer(Long userId) {
         Player player = null;
         if (!contains(userId) && (getAll().isEmpty() || isRegisteredProcess(getAll()))) {
             String newPlayerName = NamesUtils.getName(userRepository.findUserById(userId));
@@ -166,6 +178,8 @@ public class PlayerRepository {
                     .registeredAt(LocalDateTime.now())
                     .build();
             players.put(userId, player);
+        } else if (contains(userId)) {
+            player = players.get(userId);
         }
         return AddPlayerModel.builder()
                 .added(player)

@@ -31,15 +31,23 @@ public class SenderService implements AdminNotifier {
     private static final Long CHAT_ID = -1004434014698L;
     private static final Integer TOPIC_MAFIA_ID = 5;
 
+    private void sendSystemMessage(String chatId, String text) {
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(chatId)
+                .text(text)
+                .build();
+        sendNowPrivate(sendMessage);
+    }
+
     public void sentMessage(String text, Long chatId) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getSendMessage(chatId, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sendMafiaMessage(String text) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sendMafiaMessage(String text, Integer messageId) {
@@ -52,20 +60,20 @@ public class SenderService implements AdminNotifier {
                         .messageThreadId(TOPIC_MAFIA_ID)
                         .disableNotification(true)
                         .build();
-                sendNow(copyMessage);
+                sendNowPrivate(copyMessage);
 
                 DeleteMessage deleteMessage = DeleteMessage.builder()
                         .chatId(CHAT_ID)
                         .messageId(messageId)
                         .build();
-                sendNow(deleteMessage);
+                sendNowPrivate(deleteMessage);
 
             } catch (Exception e) {
                 System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
             }
         });
         SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sendMafiaMessage(Integer messageId) {
@@ -78,13 +86,13 @@ public class SenderService implements AdminNotifier {
                         .disableNotification(true)
                         .messageThreadId(TOPIC_MAFIA_ID)
                         .build();
-                sendNow(copyMessage);
+                sendNowPrivate(copyMessage);
 
                 DeleteMessage deleteMessage = DeleteMessage.builder()
                         .chatId(CHAT_ID)
                         .messageId(messageId)
                         .build();
-                sendNow(deleteMessage);
+                sendNowPrivate(deleteMessage);
             } catch (Exception e) {
                 System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
             }
@@ -95,45 +103,47 @@ public class SenderService implements AdminNotifier {
     public void sendHTMLMessage(String text, Long chatId) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getHTMLSendMessage(chatId, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sendRedirectableMsg(String text, Long chatId) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sentMessage(String text, String channelName) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getSendMessage(channelName, text, null);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
     public void sentMessage(String text, Long chatId, ReplyKeyboardMarkup keyboardMarkup) {
         SendMessage sendMessage =
                 AnswerMethodFactory.getSendMessage(chatId, text, keyboardMarkup);
-        sendNow(sendMessage);
+        sendNowPrivate(sendMessage);
     }
 
-    public void sendNow(BotApiMethod<?> toSend) {
+    //todo переделать чтобы летело в личку бота Love38Bot - чтобы ботов для пользака не плодить
+    public void sendNowPrivate(BotApiMethod<?> toSend) {
         execute(() -> telegramClient.execute(toSend));
     }
 
-    public void sendNow(SendMessage message) {
+    public void sendNowPrivate(SendMessage message) {
         execute(() -> telegramClient.execute(message));
     }
 
-    public void sendNow(String text, Long toUserId) {
+    //todo переделать чтобы летело в личку бота Love38Bot - чтобы ботов для пользака не плодить
+    public void sendNowPrivate(String text, Long toUserId) {
         SendMessage message = AnswerMethodFactory.getSendMessage(toUserId, text, null);
         execute(() -> telegramClient.execute(message));
     }
 
-    public void sendNow(SendVideo message) {
+    public void sendNowPrivate(SendVideo message) {
         execute(() -> telegramClient.execute(message));
     }
 
-    public void sendNow(MediaMsgModel message) {
+    public void sendNowPrivate(MediaMsgModel message) {
         if (!(hasPhotoMsg(message)
                 || hasApiMsg(message)
                 || hasMedeaGroup(message)

@@ -21,10 +21,11 @@ public class WebhookController {
      * Замените "8947815756" на значение вашего telegrambots.bot-path из yml,
      * либо оставьте строкой, если он фиксированный.
      */
-    @PostMapping("/callback/8947815756")
-    public BotApiMethod<?> receiveUpdate(@RequestBody Update update) {
-        // Перенаправляем чистый JSON-объект в ваш метод удаления сообщений
-        return webHookBot.handleUpdate(update);
-    }
+//  todo  скорее всего это не нужно
+//    @PostMapping("/callback/8947815756")
+//    public BotApiMethod<?> receiveUpdate(@RequestBody Update update) {
+//        // Перенаправляем чистый JSON-объект в ваш метод удаления сообщений
+//        return webHookBot.handleUpdate(update);
+//    }
 }
 

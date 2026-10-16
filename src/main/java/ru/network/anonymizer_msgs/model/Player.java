@@ -1,29 +1,19 @@
 package ru.network.anonymizer_msgs.model;
 
-import lombok.Setter;
-import ru.network.anonymizer_msgs.enums.Role;
+import lombok.Builder;
+import lombok.Data;
+import ru.network.anonymizer_msgs.type.ActionType;
+import ru.network.anonymizer_msgs.type.Role;
 
-@Setter
+import java.time.LocalDateTime;
+
+@Data
+@Builder
 public class Player {
-    private final String id;
+    private final Long id;
     private final String name;
     private Role role;
+    private ActionType actionType;
     private boolean isAlive;
-
-    public Player(String id, String name, Role role) {
-        this.id = id;
-        this.name = name;
-        this.role = role;
-        this.isAlive = true;
-    }
-
-    // Геттеры и сеттеры
-    public String getId() { return id; }
-    public String getName() { return name; }
-    public Role getRole() { return role; }
-    public boolean isAlive() { return isAlive; }
-    public void setAlive(boolean alive) { isAlive = alive; }
-    public void setRole(Role role) {
-        this.role = role;
-    }
+    private LocalDateTime registeredAt;
 }

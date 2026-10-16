@@ -1,4 +1,4 @@
-package ru.network.anonymizer_msgs.enums;
+package ru.network.anonymizer_msgs.type;
 
 public enum Role {
     MAFIA, DON, CIVILIAN, SHERIFF;

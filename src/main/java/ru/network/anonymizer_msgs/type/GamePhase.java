@@ -1,4 +1,4 @@
-package ru.network.anonymizer_msgs.enums;
+package ru.network.anonymizer_msgs.type;
 
 public enum GamePhase {
     FIRST_NIGHT,    // Первая ночь (знакомство и свободное общение мафии)

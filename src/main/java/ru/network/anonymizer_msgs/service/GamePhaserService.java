@@ -20,6 +20,7 @@ import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
+import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.type.GamePhase;
 
 import java.time.Instant;
@@ -30,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import static ru.network.anonymizer_msgs.type.ActionType.DON_CHIFF_NIGHT;
 import static ru.network.anonymizer_msgs.type.GamePhase.*;
 
 
@@ -196,19 +198,23 @@ public class GamePhaserService {
     private void changePhase() {
         switch (currentPhase) {
             case FIRST_NIGHT -> {
-                playerRepository.setActionType();
+                playerRepository.setActionType(ActionType.FIRST_DAY);
                 currentPhase = FIRST_DAY;
             }
             case FIRST_DAY -> {
+                playerRepository.setActionType(ActionType.NIGHT);
                 currentPhase = NIGHT;
             }
             case NIGHT -> {
+                playerRepository.setActionType(playerRepository.isDonSheriffAlive() ? DON_CHIFF_NIGHT : ActionType.DAY);
                 currentPhase = playerRepository.isDonSheriffAlive() ? DON_SHERIFF_NIGHT : DAY;
             }
             case DAY -> {
+                playerRepository.setActionType(ActionType.NIGHT);
                 currentPhase = NIGHT;
             }
             case DON_SHERIFF_NIGHT -> {
+                playerRepository.setActionType(ActionType.DAY);
                 currentPhase = DAY;
             }
         }

@@ -17,8 +17,10 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
+import ru.network.anonymizer_msgs.model.Player;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -95,8 +97,7 @@ public class SenderService implements AdminNotifier {
 
     public Optional<Integer> editMafiaMessage(String text, Integer messageId) {
         EditMessageText editMessage = AnswerMethodFactory.getEditMessage(CHAT_ID, messageId, text, null);
-        return execute(() -> telegramClient.execute(editMessage))
-                .map(Message::getMessageId);
+        return executeGeneric(editMessage).map(m -> m instanceof Message msg ? msg.getMessageId() : null);
     }
 
     public Optional<Integer> sendMafiaMessage(String text, Integer messageId) {
@@ -175,6 +176,17 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
+    /**
+     * Отправляет текст пользователю и возвращает messageId.
+     */
+    public void sendNowPrivate(String text, List<Player> toUsers) {
+        for (Player p : toUsers) {
+            SendMessage message = AnswerMethodFactory.getSendMessage(p.getId(), text, null);
+            executeGeneric(message);
+            sleep();
+        }
+    }
+
     public Optional<Message> sendNowPrivate(SendVideo message) {
         return execute(() -> telegramClient.execute(message));
     }
@@ -241,6 +253,13 @@ public class SenderService implements AdminNotifier {
                 .map(apis -> !apis.isEmpty())
                 .orElse(false);
     }
+
+    private void sleep() {
+        try {
+            Thread.sleep(100);
+        } catch (Exception e) {}
+    }
+
 
     private boolean hasMedeaGroup(MediaMsgModel message) {
         return message.getMediaGroup() != null;

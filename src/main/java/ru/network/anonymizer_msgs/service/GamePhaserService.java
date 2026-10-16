@@ -18,14 +18,17 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
+import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 import ru.network.anonymizer_msgs.type.GamePhase;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static ru.network.anonymizer_msgs.type.GamePhase.*;
 
@@ -35,15 +38,19 @@ import static ru.network.anonymizer_msgs.type.GamePhase.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class GamePhaserService {
 
-    private static GamePhase currentPhase;
+    private final PlayerRepository playerRepository;
     private final SenderService senderService;
     private final AtomicInteger timer = new AtomicInteger(0);
     private final AtomicInteger lastMessageId = new AtomicInteger(0);
+    private static GamePhase currentPhase;
     private static final Integer SECOND_60 = 60;
     private static final Integer SECOND_30 = 30;
     private static final Integer SECOND_180 = 180;
     private static final String FIRST_NIGHT_MSG = "🌌 Наступила ПЕРВАЯ НОЧЬ. У Мафии есть %s секунд на договорку в чате t.me/Love38Bot";
-    private static final String PRIVATE_FIRST_NIGHT_MSG = "";
+    private static final String PRIVATE_FIRST_NIGHT_MSG = "\uD83C\uDFA9 ВЫ — МАФИЯ. Договоритесь о порядке отстрела. И кодовых словах. У вас 60 секунд." +
+            "\n\nБосс Мафии: %s" +
+            "\nМафия: %s" +
+            "\n\nЖители города: %s";
     private static final String FIRST_DAY_MSG = "🌅 Наступило ПЕРВОЕ УТРО. Ночь была тихой — никто не пострадал.\n\n" +
             "Начинаем первый круг: у всех %s секунд общения.\n" +
             "Голосование сегодня не проводим — информации пока нет.";
@@ -58,41 +65,17 @@ public class GamePhaserService {
     private static final String DAY_MSG = "☀\uFE0F Город просыпается. Ночь была неспокойной...\n\n" +
             "💀 Жертва мафии: %s.\n\n" +
             "Город, ваше слово. Обсуждаем и голосуем кто виноват. Выбор кнопками.";
-    private final PlayerRepository playerRepository;
+
+    private static final String MAFIA_WIN = "\uD83C\uDFA9 МАФИЯ ВЫИГРАЛА!\n\n%s";
+    private static final String CIVILIAN_WIN = "\uD83D\uDC64 ЖИТЕЛИ ВЫИГРАЛИ!\n\n%s";
 
 
     public void decrement() {
         timer.decrementAndGet();
     }
 
-    public void minus(int delta) {
-        timer.addAndGet(-delta);
-    }
-
     public void setTimer(int newVal) {
         timer.set(newVal);
-    }
-
-    public void changePhase(GamePhase newPhase) {
-//        this.currentPhase = newPhase;
-//
-//        if (newPhase == GamePhase.DAY) {
-//            notifyAllAsync("☀️ Наступил ДЕНЬ! Город просыпается.");
-//
-//            // ДОБАВИТЬ: Через 3 минуты день автоматически закроется и наступит ночь
-//            taskScheduler.schedule(
-//                    () -> changePhase(GamePhase.NIGHT),
-//                    Instant.now().plusSeconds(180)
-//            );
-//
-//        } else if (newPhase == GamePhase.NIGHT) {
-//            notifyAllAsync(" Наступила НОЧЬ! Чат мафии заблокирован.");
-//
-//            taskScheduler.schedule(
-//                    () -> changePhase(GamePhase.DAY),
-//                    Instant.now().plusSeconds(45)
-//            );
-//        }
     }
 
     public void managePhase() {
@@ -104,12 +87,18 @@ public class GamePhaserService {
         if (currentPhase == GamePhase.FIRST_NIGHT) {
             if (timer.get() < -50) {
                 setTimer(SECOND_60);
+                String donName = playerRepository.findDon().getName();
+                List<Player> mafia = playerRepository.findMafia();
+                List<Player> redPlayers = playerRepository.findRedPlayers();
+
+                senderService.sendNowPrivate(String.format(PRIVATE_FIRST_NIGHT_MSG, donName,
+                        names(mafia), names(redPlayers)), playerRepository.getAll());
                 senderService.sendMafiaMessage(String.format(FIRST_NIGHT_MSG, SECOND_60)).orElse(null);
                 lastMessageId.set(messageId);
             } else {
                 int second = timer.decrementAndGet();
                 senderService.editMafiaMessage(String.format(FIRST_NIGHT_MSG, second), lastMessageId.get())
-                                .orElse(null);
+                        .orElse(null);
                 checkChangePhase();
             }
         } else if (currentPhase == FIRST_DAY) {
@@ -164,9 +153,16 @@ public class GamePhaserService {
         checkEndGame();
     }
 
+    private String names(List<Player> players) {
+        return players.stream()
+                .map(Player::getName)
+                .collect(Collectors.joining(", "));
+    }
+
     private void checkEndGame() {
-        // проверить остались ли красные и черные
-        // если конец gameOver()
+        if (!playerRepository.isRedMoreBlack()) {
+            gameOver();
+        }
     }
 
     private void checkChangePhase() {
@@ -202,10 +198,20 @@ public class GamePhaserService {
     }
 
     /**
-     * Автоматический запуск игры при наборе 10 человек
+     * Отчет по окончанию игры
      */
     public void gameOver() {
         currentPhase = null;
+        String winMsg = playerRepository.isRedMoreBlack() ? CIVILIAN_WIN : MAFIA_WIN;
+        List<Player> players = playerRepository.getAll();
+        String collect = players.stream()
+                .map(p -> isAliveEmoji(p.isAlive()) + p.getName() + ": " + p.getRole())
+                .collect(Collectors.joining("\n"));
+        senderService.sendMafiaMessage(String.format(winMsg, collect));
+    }
+
+    private String isAliveEmoji(boolean isAlive) {
+        return isAlive ? "\uD83D\uDC9A" : "☠\uFE0F";
     }
 
     @Scheduled(fixedRate = 1, timeUnit = TimeUnit.SECONDS)

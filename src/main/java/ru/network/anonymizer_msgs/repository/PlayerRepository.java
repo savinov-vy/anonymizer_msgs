@@ -46,6 +46,30 @@ public class PlayerRepository {
         }
     }
 
+    public boolean isRedMoreBlack() {
+        List<Player> playersl = getAll();
+        int black = 0;
+        int red = 0;
+        for (Player p : playersl) {
+            if (p.isAlive()) {
+                continue;
+            }
+            if (p.getRole() == Role.MAFIA || p.getRole() == Role.DON) {
+                black++;
+            } else if (p.getRole() == Role.CIVILIAN || p.getRole() == Role.SHERIFF) {
+                red++;
+            }
+        }
+        return red > black;
+    }
+
+    public List<Player> findBlack() {
+        return getAll().stream()
+                .filter(p -> p.isAlive()
+                        && (p.getRole() == Role.MAFIA || p.getRole() == Role.DON))
+                .toList();
+    }
+
     public boolean isDonSheriffAlive() {
         return isDonAlive() || isSheriffAlive();
     }
@@ -64,6 +88,33 @@ public class PlayerRepository {
     public boolean isSheriffAlive() {
         return players.values().stream()
                 .anyMatch(p -> p.isAlive() && p.getRole() == Role.SHERIFF);
+    }
+
+    /**
+     * игрок с ролью DON.
+     */
+    public Player findDon() {
+        return players.values().stream()
+                .filter(p -> p.getRole() == Role.DON)
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * игроки мафия
+     */
+    public List<Player> findMafia() {
+        return players.values().stream()
+                .filter(p -> p.getRole() == Role.MAFIA)
+                .toList();
+    }
+
+    /**
+     * Жители города
+     */
+    public List<Player> findRedPlayers() {
+        return players.values().stream()
+                .filter(p -> (p.getRole() == Role.CIVILIAN) || (p.getRole() == Role.SHERIFF))
+                .toList();
     }
 
     public Player addPlayer(Long userId) {

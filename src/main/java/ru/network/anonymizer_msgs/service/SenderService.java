@@ -11,6 +11,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
+import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -18,8 +19,10 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
+import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
 import java.io.Serializable;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -30,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 public class SenderService implements AdminNotifier {
 
     TelegramClient telegramClient;
+    PlayerRepository playerRepository;
 
     private static final Long CHAT_ID = -1004434014698L;
     private static final Integer TOPIC_MAFIA_ID = 5;
@@ -75,6 +79,10 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
+    public <T> void sendNow(Method method) {
+        execute(() -> telegramClient.execute(method));
+    }
+
     public Optional<Integer> sendHTMLMessage(String text, Long chatId) {
         SendMessage sendMessage = AnswerMethodFactory.getHTMLSendMessage(chatId, text, null);
         return execute(() -> telegramClient.execute(sendMessage))
@@ -100,31 +108,38 @@ public class SenderService implements AdminNotifier {
         return executeGeneric(editMessage).map(m -> m instanceof Message msg ? msg.getMessageId() : null);
     }
 
-    public Optional<Integer> sendMafiaMessage(String text, Integer messageId) {
+    public void sendUserMafiaMessage(Message original) {
         CompletableFuture.runAsync(() -> {
             try {
-                CopyMessage copyMessage = CopyMessage.builder()
-                        .fromChatId(CHAT_ID)
-                        .messageId(messageId)
-                        .chatId(CHAT_ID)
-                        .messageThreadId(TOPIC_MAFIA_ID)
-                        .disableNotification(true)
-                        .build();
-                execute(() -> telegramClient.execute(copyMessage));
+                // Префикс с именем отправителя
+                String senderName = buildSenderName(original);
+                String originalText = original.getText() != null ? original.getText() : "";
+                String newText = senderName + "\n" + originalText;
 
+                // Отправляем в топик мафии
+                SendMessage sendMessage = AnswerMethodFactory.getSendMessage(
+                        CHAT_ID, TOPIC_MAFIA_ID, newText, null);
+                execute(() -> telegramClient.execute(sendMessage));
+
+                // Удаляем оригинал
                 DeleteMessage deleteMessage = DeleteMessage.builder()
                         .chatId(CHAT_ID)
-                        .messageId(messageId)
+                        .messageId(original.getMessageId())
                         .build();
                 execute(() -> telegramClient.execute(deleteMessage));
             } catch (Exception e) {
-                System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
+                System.err.println("Ошибка зеркалирования: " + e.getMessage());
             }
         });
+    }
 
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
+    private String buildSenderName(Message message) {
+        User from = message.getFrom();
+        if (from == null) return "Неизвестный:";
+        Player byId = playerRepository.findById(from.getId());
+        if (byId == null) return "Неизвестный:";
+        String name = byId.getName();
+        return "От " + name + ":";
     }
 
     public Optional<Integer> sendMafiaMessage(Integer messageId) {
@@ -265,6 +280,10 @@ public class SenderService implements AdminNotifier {
         return message.getMediaGroup() != null;
     }
 
+
+    public void deleteMessage(DeleteMessage deleteMessage) {
+        executeGeneric(deleteMessage);
+    }
     // ================== execute ==================
 
     @FunctionalInterface

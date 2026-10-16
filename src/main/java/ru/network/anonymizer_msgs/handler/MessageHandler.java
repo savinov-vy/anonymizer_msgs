@@ -3,6 +3,7 @@ package ru.network.anonymizer_msgs.handler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
@@ -15,6 +16,7 @@ import ru.network.anonymizer_msgs.type.ActionType;
 
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -71,8 +73,16 @@ public abstract class MessageHandler {
         return AnswerMethodFactory.getSendMessage(chatId, text, KeyboardFactory.getReplyKeyboard(btnNames, configs));
     }
 
+    public void sendUserMafiaMessage(Message original) {
+        senderService.sendUserMafiaMessage(original);
+    }
+
     protected void sendMessage(String text, Long chatId) {
         senderService.sentMessage(text, chatId);
+    }
+
+    protected void deleteMessage(DeleteMessage deleteMessage) {
+        senderService.deleteMessage(deleteMessage);
     }
 
     protected void sendHTMLMessage(String text, Long chatId) {

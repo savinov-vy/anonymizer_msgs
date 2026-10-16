@@ -9,8 +9,8 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor(staticName = "of")
 @NoArgsConstructor
-public class CallBackDataAnonDto {
+public class CallBackDataPlayerIdDto {
 
-	Long anonDialogId;
+	Long userId;
 
 }

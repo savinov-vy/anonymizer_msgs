@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import ru.network.anonymizer_msgs.model.AddPlayerModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.type.Role;
@@ -122,7 +123,7 @@ public class PlayerRepository {
                 .toList();
     }
 
-    public Player addPlayer(Long userId) {
+    public AddPlayerModel addPlayer(Long userId) {
         Player player = null;
         if (!contains(userId) && (getAll().isEmpty() || isRegisteredProcess(getAll()))) {
             String newPlayerName = NamesUtils.getName(userRepository.findUserById(userId));
@@ -136,7 +137,10 @@ public class PlayerRepository {
                     .build();
             players.put(userId, player);
         }
-        return player;
+        return AddPlayerModel.builder()
+                .added(player)
+                .amount(amountAll())
+                .build();
     }
 
     private boolean isRegisteredProcess(List<Player> players) {

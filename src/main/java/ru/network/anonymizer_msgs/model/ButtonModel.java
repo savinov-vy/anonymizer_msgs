@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ButtonModel {
 
-	CallBackDataAnonDto callBackDataAnonDto;
+	CallBackDataPlayerIdDto callBackDataAnonDto;
 
 }

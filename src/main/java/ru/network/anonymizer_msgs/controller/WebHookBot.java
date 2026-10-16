@@ -5,8 +5,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import ru.network.anonymizer_msgs.model.AddPlayerModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
+import ru.network.anonymizer_msgs.service.GamePhaserService;
 import ru.network.anonymizer_msgs.service.SenderService;
 
 @Service
@@ -17,6 +19,8 @@ public class WebHookBot {
     PlayerRepository playerRepository;
     MainController mainController;
     SenderService senderService;
+    GamePhaserService gamePhaserService;
+    private static final Integer COMPLETE_GAMERS = 10;
 
     public void handleUpdate(Update update) {
         Long userId = extractUserId(update);
@@ -24,11 +28,14 @@ public class WebHookBot {
             return;
         }
 
-        Player added = playerRepository.addPlayer(userId);
-        if (added == null) {
+        AddPlayerModel added = playerRepository.addPlayer(userId);
+        if (added.getAdded() == null) {
             //todo отправить в личку Love38Bot, а тут сообщение удалить
 //            "Извините, игра уже началась (10/10)."
 //            senderService.sendNow();
+        } else if (COMPLETE_GAMERS.equals(added.getAmount())) {
+            gamePhaserService.startFirstNight();
+            return;
         }
         mainController.distribute(update, added);
     }

@@ -1,33 +1,44 @@
 package ru.network.anonymizer_msgs.handler;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import org.springframework.stereotype.Service;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
+import ru.network.anonymizer_msgs.model.CallBackDataPlayerIdDto;
 import ru.network.anonymizer_msgs.model.Player;
+import ru.network.anonymizer_msgs.service.CallBackQueryService;
 import ru.network.anonymizer_msgs.type.ActionType;
+import ru.network.anonymizer_msgs.type.Role;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+@Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class NightHandler extends MessageHandler {
 
+    CallBackQueryService callBackQueryService;
+    public static final Map<Long, Long> shooterIdTargetId = new ConcurrentHashMap<>();
+
     public void execute(Update update, Player currentPlayer) {
-        // ночью еще шериф может искать босса
-        // а босс может искать шерифа
-        // это обработка колбеков чтобы не плодить ботов для пользователелей можно отправлять прямо в
-        // Love38 и там сразу пересылать пользователю ответы
+        if (update.hasCallbackQuery()) {
+            CallBackDataPlayerIdDto callBackData = callBackQueryService.getCallBackData(update);
+            String data = update.getCallbackQuery().getData();
+            if (currentPlayer.isAlive() && (currentPlayer.getRole() == Role.DON
+                    || currentPlayer.getRole() == Role.MAFIA)) {
+                shooterIdTargetId.put(currentPlayer.getId(), callBackData.getUserId());
+            }
 
-
-        // Логика отправки секретных сообщений в чат мафии
-//        if (message.getChat().isUserChat()) {
-//            String text = message.getText();
-//            try {
-//                gameService.sendMafiaChatMessage(chatId, text);
-//                broadcastToMafia(chatId, message.getMessageId());
-//                return null;
-//            } catch (IllegalStateException e) {
-//                sendSystemMessage(chatId, "⚠️ Ошибка: " + e.getMessage());
-//                return null;
-//            } catch (SecurityException e) {
-//                // Пишет обычный мирный житель — пускаем управление дальше в ваш анонимайзер
-//            }
-//        }
+        } else if (update.hasMessage()) {
+            int messageId = update.getMessage().getMessageId();
+            long chatId = update.getMessage().getChatId();
+            DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(chatId, messageId);
+            deleteMessage(deleteMessage);
+        }
     }
 
     public void activateHandler(Player player) {

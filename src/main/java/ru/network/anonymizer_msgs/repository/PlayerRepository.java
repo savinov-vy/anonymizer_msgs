@@ -67,6 +67,14 @@ public class PlayerRepository {
         return List.of();
     }
 
+    public String getResultVoters() {
+        for (Map.Entry<Long, Long> voter : DayHandler.voterIdTargetId.entrySet()) {
+            Long voterId = voter.getKey();
+            Long targetId = voter.getValue();
+            считаем за кого проголосовали и убиваем его
+        }
+    }
+
     public void kill(Long id) {
         Player player = players.get(id);
         player.setAlive(false);

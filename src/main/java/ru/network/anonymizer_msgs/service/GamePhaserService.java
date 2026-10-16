@@ -181,6 +181,8 @@ public class GamePhaserService {
                     } else if (suicides != null && suicides.size() > 1) {
                         senderService.sendMafiaMessage(String.format(MANY_SUICIDE_DAY_MSG, names));
                     }
+
+                    playerRepository.getResultVoters();
                 }
                 checkChangePhase();
             }

@@ -24,6 +24,11 @@ public class PlayerRepository {
 
     private final Map<Long, Player> players = new ConcurrentHashMap<>();
 
+    public void clear() {
+        players.clear();
+        //todo тут нужно дернуть Love38Bot чтобы перевести игроков в консистентное состояние
+    }
+
     public boolean contains(Long id) {
         return players.containsKey(id);
     }

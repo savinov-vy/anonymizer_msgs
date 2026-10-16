@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 public enum ActionType {
 	REGISTERED,
 	FIRST_NIGHT,
+	FIRST_DAY,
 	DAY,
-	NIGHT
+	NIGHT,
+	FINISHED
 }

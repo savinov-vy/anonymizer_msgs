@@ -149,6 +149,26 @@ public class GamePhaserService {
                         .orElse(null);
                 checkChangePhase();
             }
+        } else if (currentPhase == FINISHED) {
+            String header = playerRepository.isRedMoreBlack() ? CIVILIAN_WIN : MAFIA_WIN;
+            List<Player> players = playerRepository.getAll();
+            String report = players.stream()
+                    .map(p -> isAliveEmoji(p.isAlive()) + p.getName() + ": " + p.getRole())
+                    .collect(Collectors.joining("\n"));
+            String notification = "\n\n до следующей регистрации: %s";
+            String toSend = header + report + notification;
+            if (isFirstTakt()) {
+                setTimer(SECOND_60);
+                messageId = senderService.sendMafiaMessage(String.format(toSend, 60)).orElse(null);
+            } else {
+                int seconds = timer.decrementAndGet();
+                senderService.editMafiaMessage(String.format(toSend, seconds), messageId);
+                if (seconds <= 0) {
+                    currentPhase = null;
+                    playerRepository.clear();
+                }
+            }
+
         }
         checkEndGame();
     }
@@ -175,13 +195,22 @@ public class GamePhaserService {
 
     private void changePhase() {
         switch (currentPhase) {
-            case FIRST_NIGHT -> currentPhase = FIRST_DAY;
-            case FIRST_DAY -> currentPhase = NIGHT;
+            case FIRST_NIGHT -> {
+                playerRepository.setActionType();
+                currentPhase = FIRST_DAY;
+            }
+            case FIRST_DAY -> {
+                currentPhase = NIGHT;
+            }
             case NIGHT -> {
                 currentPhase = playerRepository.isDonSheriffAlive() ? DON_SHERIFF_NIGHT : DAY;
             }
-            case DAY -> currentPhase = NIGHT;
-            case DON_SHERIFF_NIGHT -> currentPhase = DAY;
+            case DAY -> {
+                currentPhase = NIGHT;
+            }
+            case DON_SHERIFF_NIGHT -> {
+                currentPhase = DAY;
+            }
         }
     }
 
@@ -201,13 +230,8 @@ public class GamePhaserService {
      * Отчет по окончанию игры
      */
     public void gameOver() {
-        currentPhase = null;
-        String winMsg = playerRepository.isRedMoreBlack() ? CIVILIAN_WIN : MAFIA_WIN;
-        List<Player> players = playerRepository.getAll();
-        String collect = players.stream()
-                .map(p -> isAliveEmoji(p.isAlive()) + p.getName() + ": " + p.getRole())
-                .collect(Collectors.joining("\n"));
-        senderService.sendMafiaMessage(String.format(winMsg, collect));
+        currentPhase = FINISHED;
+        setTimer(-100);
     }
 
     private String isAliveEmoji(boolean isAlive) {

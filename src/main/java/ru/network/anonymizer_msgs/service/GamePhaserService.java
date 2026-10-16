@@ -92,9 +92,10 @@ public class GamePhaserService {
                 String donName = playerRepository.findDon().getName();
                 List<Player> mafia = playerRepository.findMafia();
                 List<Player> redPlayers = playerRepository.findRedPlayers();
+                List<Player> blackPlayers = playerRepository.findBlackPlayers();
 
                 senderService.sendNowPrivate(String.format(PRIVATE_FIRST_NIGHT_MSG, donName,
-                        names(mafia), names(redPlayers)), playerRepository.getAll());
+                        names(mafia), names(redPlayers)),blackPlayers);
                 senderService.sendMafiaMessage(String.format(FIRST_NIGHT_MSG, SECOND_60)).orElse(null);
                 lastMessageId.set(messageId);
             } else {
@@ -166,8 +167,8 @@ public class GamePhaserService {
                 int seconds = timer.decrementAndGet();
                 senderService.editMafiaMessage(String.format(toSend, seconds), messageId);
                 if (seconds <= 0) {
-                    currentPhase = null;
                     playerRepository.clear();
+                    currentPhase = null;
                 }
             }
 

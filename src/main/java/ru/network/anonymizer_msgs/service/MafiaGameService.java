@@ -1,5 +1,8 @@
 package ru.network.anonymizer_msgs.service;
 
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
@@ -11,6 +14,8 @@ import java.util.*;
 import java.util.function.Consumer;
 
 @Service
+@RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MafiaGameService {
 
     private GamePhase currentPhase = GamePhase.FIRST_NIGHT;
@@ -20,15 +25,8 @@ public class MafiaGameService {
     private PlayerRepository playerRepository;
 
     // Слушатель для уведомления бота о событиях (смена фазы, старт игры)
-    private Consumer<String> gameNotificationListener;
+    private final Consumer<String> gameNotificationListener;
 
-    public MafiaGameService(ThreadPoolTaskScheduler taskScheduler,
-                            SenderService senderService,
-                            PlayerRepository playerRepository) {
-        this.taskScheduler = taskScheduler;
-        this.senderService = senderService;
-        this.playerRepository = playerRepository;
-    }
 
     public void setRandomRoles() {
         // 1. Формируем пул из 10 спортивных ролей

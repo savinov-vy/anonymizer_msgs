@@ -68,7 +68,7 @@ public class PlayerRepository {
         return red > black;
     }
 
-    public List<Player> findBlack() {
+    public List<Player> findBlackPlayers() {
         return getAll().stream()
                 .filter(p -> p.isAlive()
                         && (p.getRole() == Role.MAFIA || p.getRole() == Role.DON))

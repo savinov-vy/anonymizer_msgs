@@ -54,6 +54,19 @@ public class AnswerMethodFactory {
     }
 
     /**
+     * EditMessageText - метод для редактирования текста сообщения.
+     * messageThreadId не требуется — достаточно chatId и messageId.
+     */
+    public static EditMessageText getEditMessage(Long chatId, Integer messageId, String text, InlineKeyboardMarkup keyboard) {
+        return EditMessageText.builder()
+                .chatId(String.valueOf(chatId))
+                .messageId(messageId)
+                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
+                .replyMarkup(keyboard)
+                .build();
+    }
+
+    /**
      * SendMessage - метод для отправки сообщения ботом пользователю
      */
     public static SendMessage getHTMLSendMessage(Long chatId, String text, ReplyKeyboardMarkup keyboard) {

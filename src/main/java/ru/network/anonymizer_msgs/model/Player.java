@@ -14,6 +14,9 @@ public class Player {
     private final String name;
     private Role role;
     private ActionType actionType;
+    /**
+     * жив или нет
+     */
     private boolean isAlive;
     private LocalDateTime registeredAt;
 }

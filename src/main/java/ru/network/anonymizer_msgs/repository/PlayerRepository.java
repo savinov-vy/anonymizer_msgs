@@ -151,6 +151,14 @@ public class PlayerRepository {
                 .toList();
     }
 
+    public List<Long> findAliveBlackPlayerIds() {
+        return getAll().stream()
+                .filter(p -> p.isAlive()
+                        && (p.getRole() == Role.MAFIA || p.getRole() == Role.DON))
+                .map(Player::getId)
+                .toList();
+    }
+
     public boolean isDonSheriffAlive() {
         return isDonAlive() || isSheriffAlive();
     }

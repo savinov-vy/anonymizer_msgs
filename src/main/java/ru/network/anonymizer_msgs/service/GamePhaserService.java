@@ -202,6 +202,7 @@ public class GamePhaserService {
                 currentPhase = NIGHT;
             }
             case NIGHT -> {
+                reportService.sendResultReportNight();
                 playerRepository.setActionType(playerRepository.isDonSheriffAlive() ? DON_CHIFF_NIGHT : ActionType.DAY);
                 currentPhase = playerRepository.isDonSheriffAlive() ? DON_SHERIFF_NIGHT : DAY;
             }

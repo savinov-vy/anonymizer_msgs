@@ -191,6 +191,7 @@ public class ReportService {
         StringBuilder report = new StringBuilder();
         boolean isEqualsTarget = true;
         Long lastTargetId = null;
+        StringBuilder reportToMafiaPrivate = new StringBuilder();
         for (Map.Entry<Long, Long> voter : NightHandler.shooterIdTargetId.entrySet()) {
             Long voterId = voter.getKey();
             Long targetId = voter.getValue();

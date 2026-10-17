@@ -182,7 +182,7 @@ public class GamePhaserService {
                         senderService.sendMafiaMessage(String.format(MANY_SUICIDE_DAY_MSG, names));
                     }
 
-                    playerRepository.getResultVoters();
+                    senderService.sendMafiaMessage(playerRepository.getResultVoters());
                 }
                 checkChangePhase();
             }

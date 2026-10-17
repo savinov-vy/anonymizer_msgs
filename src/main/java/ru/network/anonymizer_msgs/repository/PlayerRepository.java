@@ -14,11 +14,9 @@ import ru.network.anonymizer_msgs.type.Role;
 import ru.network.anonymizer_msgs.utils.NamesUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +32,13 @@ public class PlayerRepository {
         players.clear();
         //todo тут нужно дернуть Love38Bot чтобы перевести игроков в консистентное состояние
     }
+    private static final List<String> VERDICTS = List.of(
+            "\uD83D\uDC80 %s казнён.",
+            "⚰\uFE0F Город вынес приговор: %s казнён.",
+            "\uD83E\uDE78 %s вздёрнут на виселице.",
+            "\uD83D\uDC80 %s отправлен на эшафот",
+            "\uD83E\uDEA6 %s казнён. Город не прощает."
+    );
 
     public List<Player> getSuicides(GamePhase gamePhase) {
         if (gamePhase == GamePhase.NIGHT) {
@@ -68,11 +73,31 @@ public class PlayerRepository {
     }
 
     public String getResultVoters() {
+        StringBuilder report = new StringBuilder();
+        report.append("\uD83E\uDE78 Голосование окончено. Город назвал имена.\n\n");
+        Map<Long, Integer> result = new HashMap<>();
         for (Map.Entry<Long, Long> voter : DayHandler.voterIdTargetId.entrySet()) {
             Long voterId = voter.getKey();
             Long targetId = voter.getValue();
-            считаем за кого проголосовали и убиваем его
+            String voterName = players.get(voterId).getName();
+            String targetName = players.get(targetId).getName();
+            report.append(String.format("\uD83D\uDD2A %s проголосовал против %s.\n", voterName, targetName));
+            result.merge(targetId, 1, Integer::sum);
         }
+        report.append("\n⚖\uFE0F Счёт:\n");
+        Long targetUserId = null;
+        Integer maxVote = 0;
+        for (Map.Entry<Long, Integer> resultEntry : result.entrySet()) {
+            Long userId = resultEntry.getKey();
+            Integer amountVote = resultEntry.getValue();
+            String playerName = players.get(userId).getName();
+            report.append(playerName + " - " + amountVote);
+            targetUserId = maxVote < amountVote ? userId : targetUserId;
+        }
+        report.append(String.format(getRandom(VERDICTS), players.get(targetUserId).getName()));
+        report.append("\uD83C\uDF11 Ночь близко...");
+        kill(targetUserId);
+        return report.toString();
     }
 
     public void kill(Long id) {
@@ -200,4 +225,11 @@ public class PlayerRepository {
                 .allMatch(p -> p.getActionType() == ActionType.REGISTERED);
     }
 
+    private static String getRandom(List<String> texts) {
+        if (texts == null || texts.isEmpty()) {
+            return null;
+        }
+        int index = ThreadLocalRandom.current().nextInt(texts.size());
+        return texts.get(index);
+    }
 }

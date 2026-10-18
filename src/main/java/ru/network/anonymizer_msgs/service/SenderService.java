@@ -309,6 +309,10 @@ public class SenderService implements AdminNotifier {
         }
     }
 
+    private void sendPrivateToMainBot() {
+
+    }
+
     /**
      * Обёртка для BotApiMethod с неизвестным типом (wildcard).
      */

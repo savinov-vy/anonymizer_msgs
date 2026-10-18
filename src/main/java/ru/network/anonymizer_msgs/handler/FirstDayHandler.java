@@ -16,6 +16,7 @@ import ru.network.anonymizer_msgs.type.ActionType;
 public class FirstDayHandler extends MessageHandler {
 
     public void execute(Update update, Player currentPlayer) {
+        // нужно добавить что пользователь в игре, иначе просто удаляем
         if (update.hasMessage()) {
             sendUserMafiaMessage(update.getMessage());
         }

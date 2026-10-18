@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,7 @@ public class NightHandler extends MessageHandler {
 
     CallBackQueryService callBackQueryService;
     public static final Map<Long, Long> shooterIdTargetId = new ConcurrentHashMap<>();
+    public static final AtomicBoolean isSendMsg = new AtomicBoolean(false);
     PlayerRepository playerRepository;
     GamePhaserService gamePhaserService;
     SenderService senderService;
@@ -50,7 +52,9 @@ public class NightHandler extends MessageHandler {
                     || currentPlayer.getRole() == Role.MAFIA)) {
                 shooterIdTargetId.put(currentPlayer.getId(), callBackData.getUserId());
             }
-            if (amountShooting().equals(playerRepository.findAliveBlackPlayers().size())) {
+            if (!isSendMsg.get()
+                    && amountShooting().equals(playerRepository.findAliveBlackPlayers().size())) {
+                isSendMsg.set(true);
                 senderService.sendMafiaMessage(getRandom(FAST_CHOOSE_MSG));
                 gamePhaserService.setTimer(3);
             }
@@ -60,6 +64,11 @@ public class NightHandler extends MessageHandler {
             DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(chatId, messageId);
             deleteMessage(deleteMessage);
         }
+    }
+
+    public void resetCashes() {
+        shooterIdTargetId.clear();
+        isSendMsg.set(false);
     }
 
     private static String getRandom(List<String> descriptions) {

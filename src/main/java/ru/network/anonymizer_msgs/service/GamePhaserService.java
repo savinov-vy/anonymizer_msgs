@@ -36,7 +36,7 @@ public class GamePhaserService {
     private static GamePhase currentPhase;
     private static final Integer SECOND_60 = 60;
     private static final Integer SECOND_30 = 30;
-    private static final Integer SECOND_180 = 180;
+    private static final Integer SECOND_120 = 120;
     private static final String FIRST_NIGHT_MSG = "🌌 Наступила ПЕРВАЯ НОЧЬ. У Мафии есть %s секунд на договорку в чате t.me/Love38Bot";
     private static final String PRIVATE_FIRST_NIGHT_MSG = "\uD83C\uDFA9 ВЫ — МАФИЯ. Договоритесь о порядке отстрела. И кодовых словах. У вас 60 секунд." +
             "\n\nБосс Мафии: %s" +
@@ -131,8 +131,8 @@ public class GamePhaserService {
             }
         } else if (currentPhase == DAY) {
             if (isFirstTakt()) {
-                setTimer(SECOND_180);
-                messageId = senderService.sendMafiaMessage(String.format(DAY_MSG, SECOND_180))
+                setTimer(SECOND_120);
+                messageId = senderService.sendMafiaMessage(String.format(DAY_MSG, SECOND_120))
                         .orElse(null);
                 lastMessageId.set(messageId);
             } else {

@@ -70,25 +70,36 @@ public class DayHandler extends MessageHandler {
             sendUserMafiaMessage(update.getMessage());
         } else if (update.hasCallbackQuery() && currentPlayer.isAlive()) {
             CallBackDataPlayerIdDto callBackData = callBackQueryService.getCallBackData(update);
-            if (currentPlayer.isAlive()) {
+            if (currentPlayer.isAlive() && playerRepository.isAlive(callBackData.getUserId())) {
                 voterIdTargetId.put(currentPlayer.getId(), callBackData.getUserId());
                 if (isSendMsg.get()) {
                     String voterName = playerRepository.findById(currentPlayer.getId()).getName();
                     String targetName = playerRepository.findById(callBackData.getUserId()).getName();
-                    getAmountVote()
-                    senderService.sendMafiaMessage(
-                            playerRepository.findById(String.format(getRandom(NEW_TARGET_MSGS), playerRepository.findById()currentPlayer.getId().getName()
-                    );
+                    String amountAgainst = amountVoteAgainst(callBackData.getUserId());
+                    String newTargetMsg = getRandom(NEW_TARGET_MSGS);
+                    senderService.sendMafiaMessage(String.format(newTargetMsg, voterName, targetName, amountAgainst));
                 }
             }
             if (amountVoters().equals(playerRepository.findAliveBlackPlayers().size())) {
                 if (!isSendMsg.get()) {
+                    isSendMsg.set(true);
                     senderService.sendMafiaMessage(getRandom(FAST_CHOOSE_MSG));
                     gamePhaserService.setTimer(120);
                 }
 
             }
-        } else
+        }
+    }
+
+    public String amountVoteAgainst(Long userId) {
+        Integer total = 0;
+        for (Map.Entry<Long, Long> voter : voterIdTargetId.entrySet()) {
+            Long valueAgainst = voter.getValue();
+            if (userId.equals(valueAgainst)) {
+                total++;
+            }
+        }
+        return total == 0 ? "" : String.valueOf(total);
     }
 
     public static void resetCashes() {

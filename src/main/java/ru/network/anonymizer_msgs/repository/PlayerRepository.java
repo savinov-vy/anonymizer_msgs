@@ -131,6 +131,11 @@ public class PlayerRepository {
         }
     }
 
+    public boolean isAlive(Long userId) {
+        Player player = players.get(userId);
+        return player != null && player.isAlive();
+    }
+
     public boolean isRedMoreBlack() {
         List<Player> playersl = getAll();
         int black = 0;

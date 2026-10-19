@@ -28,12 +28,14 @@ import static ru.network.anonymizer_msgs.type.GamePhase.*;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class GamePhaserService {
 
-    private final PlayerRepository playerRepository;
-    private final ReportService reportService;
-    private final SenderService senderService;
-    private final AtomicInteger timer = new AtomicInteger(0);
-    private final AtomicInteger lastMessageId = new AtomicInteger(0);
-    private static GamePhase currentPhase;
+    PlayerRepository playerRepository;
+    ReportService reportService;
+    SenderService senderService;
+    AtomicInteger timer = new AtomicInteger(0);
+    AtomicInteger lastMessageId = new AtomicInteger(0);
+    GamePlayerService gamePlayerService;
+    MafiaClientService mafiaClientService;
+    private static volatile GamePhase currentPhase;
     private static final Integer SECOND_60 = 60;
     private static final Integer SECOND_30 = 30;
     private static final Integer SECOND_120 = 120;
@@ -56,16 +58,37 @@ public class GamePhaserService {
     private static final String MAFIA_WIN = "\uD83C\uDFA9 МАФИЯ ВЫИГРАЛА!\n\n%s";
     private static final String CIVILIAN_WIN = "\uD83D\uDC64 ЖИТЕЛИ ВЫИГРАЛИ!\n\n%s";
 
-
-    public void decrement() {
-        timer.decrementAndGet();
+    /**
+     * Автоматический запуск игры при наборе 10 человек
+     */
+    public synchronized void startFirstNight() {
+        playerRepository.setActionType(ActionType.FIRST_NIGHT);
+        List<Player> players = getRandomRoles();
+        gamePlayerService.createNewGame(players);
+        mafiaClientService.sendStartGame();
+        sleep();
+        setTimer(-100);
+        currentPhase = GamePhase.FIRST_NIGHT;
     }
 
-    public void setTimer(int newVal) {
-        timer.set(newVal);
+    public List<Player> getRandomRoles() {
+        // 1. Формируем пул из 10 спортивных ролей
+        List<Role> rolePool = new ArrayList<>(List.of(
+                Role.DON, Role.MAFIA, Role.MAFIA, // 3 черных
+                Role.SHERIFF,                     // 1 шериф
+                Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN,
+                Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN // 6 мирных
+        ));
+        Collections.shuffle(rolePool);
+        int i = 0;
+        List<Player> players = playerRepository.getAll();
+        for (Player player : players) {
+            player.setRole(rolePool.get(i++));
+        }
+        return players;
     }
 
-    public void managePhase() {
+    public synchronized void managePhase() {
         if (currentPhase == null) {
             return;
         }
@@ -74,13 +97,7 @@ public class GamePhaserService {
         if (currentPhase == GamePhase.FIRST_NIGHT) {
             if (isFirstTakt()) {
                 setTimer(SECOND_60);
-                String donName = playerRepository.findDon().getName();
-                List<Player> mafia = playerRepository.findMafia();
-                List<Player> redPlayers = playerRepository.findRedPlayers();
-                List<Player> blackPlayers = playerRepository.findAliveBlackPlayers();
-
-                senderService.sendNowPrivate(String.format(PRIVATE_FIRST_NIGHT_MSG, donName,
-                        names(mafia), names(redPlayers)), blackPlayers);
+                senderService.sendFirstNightPrivate();
                 senderService.sendMafiaMessage(String.format(FIRST_NIGHT_MSG, SECOND_60)).orElse(null);
                 lastMessageId.set(messageId);
             } else {
@@ -150,10 +167,11 @@ public class GamePhaserService {
             String toSend = header + report + notification;
             if (isFirstTakt()) {
                 setTimer(SECOND_60);
-                messageId = senderService.sendMafiaMessage(String.format(toSend, 60)).orElse(null);
+                messageId = senderService.sendMafiaMessage(String.format(toSend, SECOND_60)).orElse(null);
+                lastMessageId.set(messageId);
             } else {
                 int seconds = timer.decrementAndGet();
-                senderService.editMafiaMessage(String.format(toSend, seconds), messageId);
+                senderService.editMafiaMessage(String.format(toSend, seconds), lastMessageId.get());
                 if (seconds <= 0) {
                     playerRepository.clear();
                     currentPhase = null;
@@ -187,7 +205,7 @@ public class GamePhaserService {
         decrement();
     }
 
-    private void changePhase() {
+    private synchronized void changePhase() {
         switch (currentPhase) {
             case FIRST_NIGHT -> {
                 playerRepository.setActionType(ActionType.FIRST_DAY);
@@ -219,41 +237,26 @@ public class GamePhaserService {
     }
 
     /**
-     * Автоматический запуск игры при наборе 10 человек
-     */
-    public void startFirstNight() {
-        playerRepository.setActionType(ActionType.FIRST_NIGHT);
-        setRandomRoles();
-        setTimer(-100);
-        currentPhase = GamePhase.FIRST_NIGHT;
-    }
-
-    public void setRandomRoles() {
-        // 1. Формируем пул из 10 спортивных ролей
-        List<Role> rolePool = new ArrayList<>(List.of(
-                Role.DON, Role.MAFIA, Role.MAFIA, // 3 черных
-                Role.SHERIFF,                     // 1 шериф
-                Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN, Role.CIVILIAN // 6 мирных
-        ));
-        Collections.shuffle(rolePool);
-
-        // 2. Раздаем роли игрокам в карте
-        int i = 0;
-        List<Player> players = playerRepository.getAll();
-        // сначала сохраним игроков в настоящую БД, и создадим игру, затем дернем контроллер
-        //todo нужно дернуть контроллер начала игры сообщение есть на бэке
-        for (Player player : players) {
-            player.setRole(rolePool.get(i++));
-        }
-
-    }
-
-    /**
      * Отчет по окончанию игры
      */
-    public void gameOver() {
+    private void gameOver() {
         currentPhase = FINISHED;
         setTimer(-100);
+    }
+
+    public void decrement() {
+        timer.decrementAndGet();
+    }
+
+    public synchronized void setTimer(int newVal) {
+        timer.set(newVal);
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+        }
     }
 
     private String isAliveEmoji(boolean isAlive) {

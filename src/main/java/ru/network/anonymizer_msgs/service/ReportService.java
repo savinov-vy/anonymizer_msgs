@@ -218,7 +218,7 @@ public class ReportService {
             toMafiaChatReport = toMafiaChatReport + "\n\n" + suicidesReportNight;
         }
         senderService.sendMafiaMessage(toMafiaChatReport);
-        NightHandler.shooterIdTargetId.clear();
+        NightHandler.resetCashes();
     }
 
     public void sendResultReportDay() {
@@ -253,7 +253,7 @@ public class ReportService {
         report.append("\uD83C\uDF11 Ночь близко...");
         kill(targetUserId);
         senderService.sendMafiaMessage(report.toString());
-        DayHandler.voterIdTargetId.clear();
+        DayHandler.resetCashes();
     }
 
     public void kill(Long id) {

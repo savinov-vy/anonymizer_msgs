@@ -3,7 +3,7 @@ package ru.network.anonymizer_msgs.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import ru.link.network.type.MafiaColor;
+import ru.network.anonymizer_msgs.type.MafiaPlayerColor;
 
 /**
  * сохранение уже после регистрации
@@ -32,10 +32,10 @@ public class MafiaPlayerRed extends MafiaPlayer {
 	String playerName;
 
 	/**
-	 * является ли комиссаром
+	 * является ли шерифом
 	 */
-	@Column(name = "is_commissar")
-	Boolean isCommissar;
+	@Column(name = "is_sheriff")
+	Boolean isSheriff;
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "mafia_game_id")
@@ -45,14 +45,17 @@ public class MafiaPlayerRed extends MafiaPlayer {
 	public Long getId() {
 		return playerId;
 	}
+
 	@Override
-	public MafiaColor getColor() {
-		return MafiaColor.RED;
+	public MafiaPlayerColor getColor() {
+		return MafiaPlayerColor.RED;
 	}
+
 	@Override
 	public boolean isLead() {
-		return isCommissar;
+		return isSheriff;
 	}
+
 	@Override
 	public String getName() {
 		return playerName;

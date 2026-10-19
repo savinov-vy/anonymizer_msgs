@@ -43,10 +43,41 @@ public class MafiaClientService {
         mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/to-users", payload));
     }
 
-    public void sendFirstNightUsers(List<Long> userIds) {
-        mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/first-night", SendMessageFirstNightDto.builder()
-                .userIds(userIds)
-                .build()));
+    public void sendStartGame() {
+        mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/start-game"));
+    }
+
+    public void sendEndGame() {
+        mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/end-game"));
+    }
+
+    public void sendFirstNightUsers() {
+        mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/first-night"));
+    }
+
+    private void executeWithRetry(String path) {
+        try {
+            doPost(path);
+            log.debug("Mafia message delivered. path={}", path);
+        } catch (Exception firstEx) {
+            log.warn("Mafia send failed, retrying in {} ms. path={}, error={}",
+                    mafiaClientProperties.getRetryDelayMs(), path, firstEx.getMessage());
+            sleep(mafiaClientProperties.getRetryDelayMs());
+            try {
+                doPost(path);
+                log.debug("Mafia message delivered after retry. path={}", path);
+            } catch (Exception secondEx) {
+                log.error("Mafia send failed after retry. path={}", path, secondEx);
+            }
+        }
+    }
+
+    private MessageResponseDto doPost(String path) {
+        return restClient.post()
+                .uri(mafiaClientProperties.getBaseUrl() + path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .body(MessageResponseDto.class);
     }
 
     private void executeWithRetry(String path, Object payload) {
@@ -62,7 +93,6 @@ public class MafiaClientService {
                 log.debug("Mafia message delivered after retry. path={}", path);
             } catch (Exception secondEx) {
                 log.error("Mafia send failed after retry. path={}", path, secondEx);
-                // не пробрасываем — ответ никому не нужен
             }
         }
     }

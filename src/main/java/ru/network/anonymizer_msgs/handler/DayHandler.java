@@ -91,7 +91,7 @@ public class DayHandler extends MessageHandler {
         } else
     }
 
-    public void resetCashes() {
+    public static void resetCashes() {
         voterIdTargetId.clear();
         isSendMsg.set(false);
     }

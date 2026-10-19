@@ -27,16 +27,16 @@ public class MafiaGame {
 	Long id;
 
 	/**
-	 * комиссар
+	 * шериф
 	 */
-	@Column(name = "commissar_id")
-	Long commissarId;
+	@Column(name = "sheriff_id")
+	Long sheriffId;
 
 	/**
 	 * босс мафии
 	 */
-	@Column(name = "boss_mafia_id")
-	Long bossMafiaId;
+	@Column(name = "don_mafia_id")
+	Long donMafiaId;
 
 	/**
 	 * разговоры разрешены только в первую ночь
@@ -67,7 +67,7 @@ public class MafiaGame {
 	Set<MafiaPlayerBlack> mafiaPlayerBlacks = new HashSet<>();
 
 	/**
-	 * в таблице лежат все красные. Комиссар + жители города
+	 * в таблице лежат все красные. Шериф + жители города
 	 * Эта таблица нужны, чтобы черные могли скрытно переговариваться в первую ночь
 	 */
 	@Builder.Default

@@ -4,10 +4,13 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import ru.network.anonymizer_msgs.controller.WebHookBot;
+import ru.network.anonymizer_msgs.entity.User;
 import ru.network.anonymizer_msgs.handler.DayHandler;
 import ru.network.anonymizer_msgs.handler.NightHandler;
 import ru.network.anonymizer_msgs.model.AddPlayerModel;
 import ru.network.anonymizer_msgs.model.Player;
+import ru.network.anonymizer_msgs.service.SenderService;
 import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.type.GamePhase;
 import ru.network.anonymizer_msgs.type.Role;
@@ -27,6 +30,7 @@ public class PlayerRepository {
     UserRepository userRepository;
 
     private final Map<Long, Player> players = new ConcurrentHashMap<>();
+    private final SenderService senderService;
 
     public void clear() {
         players.clear();
@@ -208,8 +212,15 @@ public class PlayerRepository {
 
     public AddPlayerModel getOrCreatePlayer(Long userId) {
         Player player = null;
-        if (!contains(userId) && (getAll().isEmpty() || isRegisteredProcess(getAll()))) {
-            String newPlayerName = NamesUtils.getName(userRepository.findUserById(userId));
+        if (!contains(userId) && isRegisteredProcess(getAll())) {
+            User userById = userRepository.findUserById(userId);
+            Boolean isMan = Optional.ofNullable(userById)
+                    .map(User::getIsMan)
+                    .orElse(null);
+            if (isMan == null) {
+                return null;
+            }
+            String newPlayerName = NamesUtils.getName(userById);
             player = Player.builder()
                     .id(userId)
                     .name(newPlayerName)
@@ -219,6 +230,8 @@ public class PlayerRepository {
                     .registeredAt(LocalDateTime.now())
                     .build();
             players.put(userId, player);
+            senderService.sendMafiaMessage("Игрок " + newPlayerName + " присоединился! Всего игроков: " + players.size() + "/10");
+            WebHookBot.isSendStartFirstNight.set(false);
         } else if (contains(userId)) {
             player = players.get(userId);
         }
@@ -229,6 +242,10 @@ public class PlayerRepository {
     }
 
     private boolean isRegisteredProcess(List<Player> players) {
+        if (players.isEmpty()) {
+            return true;
+        }
+        //todo оставляем пока регистред, потом можно будет поставить size 10 регистеред универсален
         return players.stream()
                 .allMatch(p -> p.getActionType() == ActionType.REGISTERED);
     }

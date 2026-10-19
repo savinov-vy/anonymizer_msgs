@@ -8,8 +8,9 @@ import ru.network.anonymizer_msgs.type.ActionType;
 public class RegistrationHandler extends MessageHandler {
 
     public void execute(Update update, Player currentPlayer) {
-        // в целом тут можно отправлять все сообщения в чат под рандомными именами
-        // только нужно проверять что песонаж зарегистрирован Love38Bot
+        if (update.hasMessage()) {
+            sendUserMafiaMessage(update.getMessage());
+        }
     }
 
     public ActionType getHandlerType(){

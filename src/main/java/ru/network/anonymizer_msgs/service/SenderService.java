@@ -201,14 +201,10 @@ public class SenderService implements AdminNotifier {
     }
 
     /**
-     * Отправляет текст пользователю и возвращает messageId.
+     * Отправить сообщение первая ночь для мафии
      */
-    public void sendFirstNightPrivate(String text,
-                                      List<Player> toUsers) {
-        mafiaClientService.
-        List<Long> list = toUsers.stream()
-                .map(Player::getId)
-                .toList();
+    public void sendFirstNightPrivate() {
+        mafiaClientService.sendFirstNightUsers();
     }
 
     public Optional<Message> sendNowPrivate(SendVideo message) {

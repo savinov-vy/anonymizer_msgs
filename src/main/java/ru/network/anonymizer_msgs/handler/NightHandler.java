@@ -66,7 +66,7 @@ public class NightHandler extends MessageHandler {
         }
     }
 
-    public void resetCashes() {
+    public static void resetCashes() {
         shooterIdTargetId.clear();
         isSendMsg.set(false);
     }

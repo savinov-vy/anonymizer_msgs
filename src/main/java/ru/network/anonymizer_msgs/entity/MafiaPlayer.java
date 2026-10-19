@@ -1,6 +1,6 @@
 package ru.network.anonymizer_msgs.entity;
 
-import ru.link.network.type.MafiaColor;
+import ru.network.anonymizer_msgs.type.MafiaPlayerColor;
 
 /**
  * сохранение уже после регистрации
@@ -8,7 +8,7 @@ import ru.link.network.type.MafiaColor;
  */
 public abstract class MafiaPlayer {
 	public abstract Long getId();
-	public abstract MafiaColor getColor();
+	public abstract MafiaPlayerColor getColor();
 	public abstract boolean isLead();
 	public abstract String getName();
 }

@@ -34,6 +34,7 @@ public class SenderService implements AdminNotifier {
 
     TelegramClient telegramClient;
     PlayerRepository playerRepository;
+    MafiaClientService mafiaClientService;
 
     private static final Long CHAT_ID = -1004434014698L;
     private static final Integer TOPIC_MAFIA_ID = 5;
@@ -197,6 +198,17 @@ public class SenderService implements AdminNotifier {
             executeGeneric(message);
             sleep();
         }
+    }
+
+    /**
+     * Отправляет текст пользователю и возвращает messageId.
+     */
+    public void sendFirstNightPrivate(String text,
+                                      List<Player> toUsers) {
+        mafiaClientService.
+        List<Long> list = toUsers.stream()
+                .map(Player::getId)
+                .toList();
     }
 
     public Optional<Message> sendNowPrivate(SendVideo message) {

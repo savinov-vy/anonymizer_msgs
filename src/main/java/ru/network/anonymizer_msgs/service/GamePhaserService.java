@@ -38,10 +38,6 @@ public class GamePhaserService {
     private static final Integer SECOND_30 = 30;
     private static final Integer SECOND_120 = 120;
     private static final String FIRST_NIGHT_MSG = "🌌 Наступила ПЕРВАЯ НОЧЬ. У Мафии есть %s секунд на договорку в чате t.me/Love38Bot";
-    private static final String PRIVATE_FIRST_NIGHT_MSG = "\uD83C\uDFA9 ВЫ — МАФИЯ. Договоритесь о порядке отстрела. И кодовых словах. У вас 60 секунд." +
-            "\n\nБосс Мафии: %s" +
-            "\nМафия: %s" +
-            "\n\nЖители города: %s";
     private static final String FIRST_DAY_MSG = "🌅 Наступило ПЕРВОЕ УТРО. Ночь была тихой — никто не пострадал.\n\n" +
             "Начинаем первый круг: у всех %s секунд общения.\n" +
             "Голосование сегодня не проводим — информации пока нет.";
@@ -244,11 +240,12 @@ public class GamePhaserService {
         // 2. Раздаем роли игрокам в карте
         int i = 0;
         List<Player> players = playerRepository.getAll();
+        // сначала сохраним игроков в настоящую БД, и создадим игру, затем дернем контроллер
+        //todo нужно дернуть контроллер начала игры сообщение есть на бэке
         for (Player player : players) {
             player.setRole(rolePool.get(i++));
-            // Персонально уведомляем игрока о его роли
-            senderService.sendNowPrivate( "🎮 Игра началась! Ваша секретная роль: " + player.getRole().name(), player.getId());
         }
+
     }
 
     /**

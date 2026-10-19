@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import ru.network.anonymizer_msgs.config.MafiaClientProperties;
 import ru.network.anonymizer_msgs.controller.dto.MessageResponseDto;
+import ru.network.anonymizer_msgs.controller.dto.SendMessageFirstNightDto;
 import ru.network.anonymizer_msgs.controller.dto.SendMessageToUserDto;
 import ru.network.anonymizer_msgs.controller.dto.SendMessageToUsersDto;
 
@@ -40,6 +41,12 @@ public class MafiaClientService {
     public void sendToUsers(String text, List<Long> userIds) {
         SendMessageToUsersDto payload = new SendMessageToUsersDto(text, userIds);
         mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/to-users", payload));
+    }
+
+    public void sendFirstNightUsers(List<Long> userIds) {
+        mafiaSendExecutor.submit(() -> executeWithRetry("/api/mafia/first-night", SendMessageFirstNightDto.builder()
+                .userIds(userIds)
+                .build()));
     }
 
     private void executeWithRetry(String path, Object payload) {

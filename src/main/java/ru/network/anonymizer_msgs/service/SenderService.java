@@ -17,6 +17,7 @@ import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
+import ru.network.anonymizer_msgs.config.TelegramProperties;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
@@ -25,6 +26,7 @@ import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executor;
 
 @Slf4j
@@ -35,9 +37,11 @@ public class SenderService implements AdminNotifier {
 
     TelegramClient telegramClient;
     PlayerRepository playerRepository;
+    TelegramProperties telegramProperties;
     Executor notificationExecutor;
     private final MessageRepository messageRepository;
     private static final Long SUPERADMIN_ID = 7380158520L;
+    private static final Long CHAT_ID = 7380158520L;
 
 
     public void wrapAndSend(Message message) {
@@ -70,13 +74,11 @@ public class SenderService implements AdminNotifier {
         // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
 
-        if (isBanText(text) && replyToMsgId != null) {
+        if (isCurrentUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
             return;
-        }
-
-        if (isUserText(text) && replyToMsgId != null) {
+        } else if (isCurrentUserSuperAdmin(original) && isUserText(text) && replyToMsgId != null) {
             processSendId(replyToMsgId);
             executeDeleteMessage(original);
             return;
@@ -325,6 +327,18 @@ public class SenderService implements AdminNotifier {
             System.err.println("Ошибка Telegram API: " + e.getMessage());
             return Optional.empty();
         }
+    }
+
+    private boolean isCurrentUserAdmin(Message message) {
+        Set<Long> adminIds = telegramProperties.getAdminIds();
+        if (adminIds == null || adminIds.isEmpty()) {
+            return false;
+        }
+        return adminIds.contains(message.getFrom().getId());
+    }
+
+    private boolean isCurrentUserSuperAdmin(Message message) {
+        return SUPERADMIN_ID.equals(message.getFrom().getId());
     }
 
     /**

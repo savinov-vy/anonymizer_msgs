@@ -6,6 +6,8 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.Set;
+
 @Data
 @Configuration
 @ConfigurationProperties(prefix = "telegrambots")
@@ -45,4 +47,9 @@ public class TelegramProperties {
 	 * наименование бота
 	 */
 	String botName;
+
+	/**
+	 * админы
+	 */
+	Set<Long> adminIds;
 }

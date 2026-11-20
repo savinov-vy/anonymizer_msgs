@@ -11,12 +11,20 @@ import ru.network.anonymizer_msgs.config.TelegramProperties;
 import ru.network.anonymizer_msgs.service.SenderService;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component // Благодаря этому стартер автоматически подхватит и зарегистрирует бота
 public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingUpdateConsumer {
 
     private final TelegramProperties telegramProperties;
     private final SenderService senderService;
+
+    private final Map<Long, Long> lastSeen = new ConcurrentHashMap<>();
+    private final AtomicLong windowStartMs = new AtomicLong();
+    private final AtomicInteger globalCounter = new AtomicInteger();
 
     // Внедряем ваш существующий WebHookBot и конфигурационные свойства TelegramProperties
     public AnonymizerLongPooling(TelegramProperties telegramProperties, SenderService senderService) {
@@ -36,8 +44,18 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
 
     @Override
     public void consume(List<Update> updates) {
+
+        /**
+         * защита от спама, но загрузка медиа разрешена т.к. она делается
+         * поочереди и быстро
+         */
+
         // Передаем входящие сообщения в ваш готовый handleUpdate контроллера WebHookBot
         for (Update update : updates) {
+            Long userId = extractUserId(update);
+            if (!allowGlobal() || !(allow(userId) || hasMedia(update))) {
+                return;
+            }
             try {
                 if (update.hasMessage()) {
                     Message message = update.getMessage();
@@ -47,6 +65,47 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
                 System.err.println("Ошибка при обработке апдейта в MafiaLongPollingBot: " + e.getMessage());
             }
         }
+    }
+
+    private Long extractUserId(Update update) {
+        org.telegram.telegrambots.meta.api.objects.User from = null;
+
+        if (update.hasMessage()) {
+            from = update.getMessage().getFrom();
+        } else if (update.hasCallbackQuery()) {
+            from = update.getCallbackQuery().getFrom();
+        } else if (update.getMyChatMember() != null) {
+            from = update.getMyChatMember().getFrom();
+        }
+
+        if (from != null) {
+            return from.getId();
+        }
+
+        if (update.hasMessage()) {
+            return update.getMessage().getChatId();
+        }
+        return null;
+    }
+
+    //TODO утечка памяти 100тыс -> 10 Мб
+    boolean allow(Long userId) {
+        long now = System.currentTimeMillis();
+        Long prev = lastSeen.put(userId, now);
+        return prev == null || (now - prev) >= 500; // 1 сек
+    }
+
+    boolean allowGlobal() {
+        long now = System.currentTimeMillis();
+        long start = windowStartMs.get();
+        if (now - start > 1000 && windowStartMs.compareAndSet(start, now)) {
+            globalCounter.set(0);
+        }
+        return globalCounter.incrementAndGet() <= 20;
+    }
+
+    private boolean hasMedia(Update update) {
+        return update.hasMessage() && (update.getMessage().hasVideo() || update.getMessage().hasPhoto());
     }
 
     /**

@@ -33,47 +33,6 @@ public class AnswerMethodFactory {
     /**
      * SendMessage - метод для отправки сообщения ботом пользователю
      */
-    public static SendMessage getSendMessage(Long chatId, String text, ReplyKeyboardMarkup keyboard) {
-        return SendMessage.builder()
-                .chatId(String.valueOf(chatId))
-                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
-                .replyMarkup(keyboard)
-                .disableWebPagePreview(true)
-                .protectContent(false)
-                .build();
-    }
-
-    /**
-     * SendMessage - метод для отправки сообщения в топик чата
-     */
-    public static SendMessage getSendMessage(Long chatId, Integer topicId, String text, ReplyKeyboardMarkup keyboard) {
-        return SendMessage.builder()
-                .chatId(String.valueOf(chatId))
-                .messageThreadId(topicId)
-                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
-                .replyMarkup(keyboard)
-                .disableNotification(true)
-                .disableWebPagePreview(true)
-                .protectContent(false)
-                .build();
-    }
-
-    /**
-     * EditMessageText - метод для редактирования текста сообщения.
-     * messageThreadId не требуется — достаточно chatId и messageId.
-     */
-    public static EditMessageText getEditMessage(Long chatId, Integer messageId, String text, InlineKeyboardMarkup keyboard) {
-        return EditMessageText.builder()
-                .chatId(String.valueOf(chatId))
-                .messageId(messageId)
-                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
-                .replyMarkup(keyboard)
-                .build();
-    }
-
-    /**
-     * SendMessage - метод для отправки сообщения ботом пользователю
-     */
     public static SendMessage getHTMLSendMessage(Long chatId, String text, ReplyKeyboardMarkup keyboard) {
         return SendMessage.builder()
                 .chatId(String.valueOf(chatId))
@@ -102,6 +61,7 @@ public class AnswerMethodFactory {
                 .photo(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
+                .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
                 .build();
@@ -114,6 +74,7 @@ public class AnswerMethodFactory {
                 .video(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
+                .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
                 .build();
@@ -126,6 +87,7 @@ public class AnswerMethodFactory {
                 .voice(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
+                .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
                 .build();
@@ -144,6 +106,7 @@ public class AnswerMethodFactory {
                 .chatId(String.valueOf(chatId))
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
+                .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null
                         ? ReplyParameters.builder().messageId(replyToMessageId).build()
                         : null)
@@ -211,51 +174,6 @@ public class AnswerMethodFactory {
                 .photo(new InputFile(fileId))
                 .replyMarkup(keyboard)
                 .protectContent(false)
-                .build();
-    }
-
-    /**
-     * SendVideo - метод для отправки видео сообщения ботом пользователю
-     */
-    public static SendVideo getVideoMessage(Long chatId, String text, String fileId, ReplyKeyboard keyboard) {
-        return SendVideo.builder()
-                .chatId(chatId)
-                .caption(text)
-                .video(new InputFile(fileId))
-                .replyMarkup(keyboard)
-                .protectContent(true)
-                .supportsStreaming(true)
-                .parseMode("HTML")
-                .build();
-    }
-
-    /**
-     * SendVideo - метод для отправки видео сообщения ботом пользователю
-     */
-    public static SendVideo getVideoMessage(Long chatId, String text, String fileId, ReplyKeyboard keyboard, Boolean isProtectionContent) {
-        return SendVideo.builder()
-                .chatId(chatId)
-                .caption(text)
-                .video(new InputFile(fileId))
-                .replyMarkup(keyboard)
-                .protectContent(isProtectionContent)
-                .supportsStreaming(true)
-                .parseMode("HTML")
-                .build();
-    }
-
-    /**
-     * EditMessageText - метод для редактирования текста и клавиатуры сообщения
-     */
-    public static EditMessageText getEditMessageText(CallbackQuery callbackQuery,
-                                                     String newText,
-                                                     InlineKeyboardMarkup keyboard) {
-        return EditMessageText.builder()
-                .chatId(String.valueOf(callbackQuery.getMessage().getChatId()))
-                .messageId(callbackQuery.getMessage().getMessageId())
-                .text(hasText(newText) ? newText : "\uD83D\uDE0A \uD83D\uDC4D")
-                .replyMarkup(keyboard)
-                .disableWebPagePreview(true)
                 .build();
     }
 

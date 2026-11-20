@@ -66,7 +66,7 @@ public class SenderService implements AdminNotifier {
         }
         String text = getText(original);
         String senderName = buildSenderName(original);
-        String newText = senderName + "\n" + text;
+        String newText = senderName + " " + text;
         // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
 
@@ -253,11 +253,11 @@ public class SenderService implements AdminNotifier {
 
     private String buildSenderName(Message message) {
         User from = message.getFrom();
-        if (from == null) return "Неизвестный:";
+        if (from == null) return "[<b>Неизвестный</b>]";
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
-        if (byId == null) return "Неизвестный:";
+        if (byId == null) return "[<b>Неизвестный</b>]";
         String name = byId.getName();
-        return name + ":\n";
+        return "[<b>" + name + "</b>]";
     }
 
     // ================== вспомогательное ==================

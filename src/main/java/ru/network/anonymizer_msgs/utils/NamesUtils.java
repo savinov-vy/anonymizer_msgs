@@ -10,6 +10,12 @@ import java.util.concurrent.ThreadLocalRandom;
 public class NamesUtils {
 
 
+    private static final List<String> EMOJI_SET = List.of(
+            "⭐", "🌟", "✨", "💫", "🌛", "🌜", "☀️", "🌤️",
+            "🚗", "🚕", "🚙", "🏎️", "🚓", "🚑", "🚒", "🚐", "🚚", "🚛", "🛻", "🚲", "🛴", "🛵", "🏍️",
+            "🚂", "🚝", "🚁", "✈️", "🚀", "🛸", "⛵", "🚤", "🛳️"
+    );
+
     private static final List<String> EMOJI_MAN = List.of(
             "\uD83D\uDC71\u200D♂\uFE0F",
             "\uD83D\uDC68\u200D\uD83D\uDCBC",
@@ -83,7 +89,7 @@ public class NamesUtils {
             "Malik", "Kwame", "Zola", "Tunde", "Sefu",
             "Jabari", "Ayo", "Chidi", "Emeka", "Kito",
             "Yusuf", "Idris", "Hamza", "Rashid", "Farid",
-            "Nasser", "Ade", "Bola", "Femi", "Obinna",
+            "Nasser", "Ade", "Bola", "Femi",
             "Zeus", "Ares", "Helios", "Apollo", "Hermes",
             "Orion", "Perseus", "Leon", "Damian", "Xander",
             "Kostas", "Yannis", "Stavros", "Dimitri", "Alexis",
@@ -100,9 +106,9 @@ public class NamesUtils {
                 .map(User::getIsMan)
                 .orElse(false);
         if (isMan) {
-            return getRandom(EMOJI_MAN) + " " + getRandom(MAN_NAMES);
+            return getRandom(EMOJI_SET) + getRandom(EMOJI_MAN) + "" + getRandom(MAN_NAMES);
         } else {
-            return getRandom(EMOJI_WOMAN) + " " + getRandom(WOMAN_NAMES);
+            return getRandom(EMOJI_SET) + getRandom(EMOJI_WOMAN) + "" + getRandom(WOMAN_NAMES);
         }
     }
 

@@ -2,8 +2,6 @@ package ru.network.anonymizer_msgs.model;
 
 import lombok.Builder;
 import lombok.Data;
-import ru.network.anonymizer_msgs.type.ActionType;
-import ru.network.anonymizer_msgs.type.Role;
 
 import java.time.LocalDateTime;
 
@@ -12,11 +10,9 @@ import java.time.LocalDateTime;
 public class Player {
     private final Long id;
     private final String name;
-    private Role role;
-    private ActionType actionType;
     /**
      * жив или нет
      */
-    private boolean isAlive;
+    private LocalDateTime banEndAt;
     private LocalDateTime registeredAt;
 }

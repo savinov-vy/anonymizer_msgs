@@ -10,10 +10,12 @@ import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
+import org.telegram.telegrambots.meta.api.objects.ReplyParameters;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaVideo;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -87,6 +89,24 @@ public class AnswerMethodFactory {
                 .chatId(String.valueOf(chatId))
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
+                .disableWebPagePreview(true)
+                .protectContent(false)
+                .build();
+    }
+
+    public static SendMessage getSendMessageRedirectable(
+            Long chatId,
+            Integer replyToMessageId, // Добавили ID сообщения, на которое отвечаем
+            String text,
+            ReplyKeyboardMarkup keyboard) {
+
+        return SendMessage.builder()
+                .chatId(String.valueOf(chatId))
+                .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
+                .replyMarkup(keyboard)
+                .replyParameters(replyToMessageId != null
+                        ? ReplyParameters.builder().messageId(replyToMessageId).build()
+                        : null)
                 .disableWebPagePreview(true)
                 .protectContent(false)
                 .build();

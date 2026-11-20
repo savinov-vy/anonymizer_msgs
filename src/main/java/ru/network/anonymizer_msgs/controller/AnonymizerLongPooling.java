@@ -13,13 +13,13 @@ import ru.network.anonymizer_msgs.service.SenderService;
 import java.util.List;
 
 @Component // Благодаря этому стартер автоматически подхватит и зарегистрирует бота
-public class MafiaLongPollingBot implements SpringLongPollingBot, LongPollingUpdateConsumer {
+public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingUpdateConsumer {
 
     private final TelegramProperties telegramProperties;
     private final SenderService senderService;
 
     // Внедряем ваш существующий WebHookBot и конфигурационные свойства TelegramProperties
-    public MafiaLongPollingBot(TelegramProperties telegramProperties, SenderService senderService) {
+    public AnonymizerLongPooling(TelegramProperties telegramProperties, SenderService senderService) {
         this.telegramProperties = telegramProperties;
         this.senderService = senderService;
     }

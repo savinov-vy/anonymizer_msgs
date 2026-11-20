@@ -3,6 +3,7 @@ package ru.network.anonymizer_msgs.service;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,11 +16,13 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
+import ru.network.anonymizer_msgs.repository.MessageRepository;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -28,16 +31,12 @@ public class SenderService implements AdminNotifier {
     TelegramClient telegramClient;
     PlayerRepository playerRepository;
     Executor notificationExecutor;
-
-    private static final Long CHAT_ID = -1004470617675L;
-
-    // ================== системные/простые отправки =================
+    private final MessageRepository messageRepository;
 
 
     public void wrapAndSend(Message message) {
         notificationExecutor.execute(() -> sendUserMessage(message));
     }
-
 
     /**
      * Отправляет сообщение и возвращает messageId.
@@ -54,21 +53,64 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
+// Инжектим ваш репозиторий
+
     public void sendUserMessage(Message original) {
         String senderName = buildSenderName(original);
         String originalText = original.getText() != null ? original.getText() : "";
         String newText = senderName + "\n" + originalText;
 
+        // 1. Формируем сообщение (отвечаем на original.getMessageId())
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
-                CHAT_ID, newText, null);
-        execute(() -> telegramClient.execute(sendMessage));
+                original.getChatId(),
+                getReplyToMessage(original), // Теперь replyParameters будет работать
+                newText,
+                null
+        );
 
-        // Удаляем оригинал
+        // 2. Отправляем СИНХРОННО, чтобы получить ID нового сообщения
+        try {
+            Message sentMessage = telegramClient.execute(sendMessage);
+
+            // 3. Сохраняем в Map: ID нового сообщения в чате -> контекст пользователя
+            if (sentMessage != null) {
+                messageRepository.saveMessage(
+                        sentMessage.getMessageId(), // ID сообщения в анонимном чате
+                        original.getChatId(),       // Кому отвечать (ID в личке)
+                        original.getMessageId(),    // ID в личке
+                        null,                       // fileId (пока null, т.к. только текст)
+                        originalText
+                );
+            }
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при отправке сообщения", e);
+            // Если не удалось отправить — прерываем выполнение, чтобы не удалять оригинал
+            return;
+        }
+
+        // 4. Удаляем оригинал (делаем это ПОСЛЕ успешной отправки)
         DeleteMessage deleteMessage = DeleteMessage.builder()
-                .chatId(CHAT_ID)
+                .chatId(String.valueOf(original.getChatId())) // telegramClient ожидает String
                 .messageId(original.getMessageId())
                 .build();
-        execute(() -> telegramClient.execute(deleteMessage));
+
+        execute(() -> {
+            try {
+                telegramClient.execute(deleteMessage);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при удалении сообщения", e);
+            }
+            return null;
+        });
+    }
+
+    private Integer getReplyToMessage(Message message) {
+        if (message.isReply()) {
+            Message repliedTo = message.getReplyToMessage();
+
+            return repliedTo.getMessageId(); // 71
+        }
+        return null;
     }
 
     private String buildSenderName(Message message) {
@@ -77,9 +119,8 @@ public class SenderService implements AdminNotifier {
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "Неизвестный:";
         String name = byId.getName();
-        return "От " + name + ":";
+        return name + ":\n";
     }
-
 
     // ================== вспомогательное ==================
 

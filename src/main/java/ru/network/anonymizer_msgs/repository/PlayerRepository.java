@@ -6,7 +6,6 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import ru.network.anonymizer_msgs.entity.User;
 import ru.network.anonymizer_msgs.model.Player;
-import ru.network.anonymizer_msgs.type.ActionType;
 import ru.network.anonymizer_msgs.utils.NamesUtils;
 
 import java.time.LocalDateTime;
@@ -32,7 +31,7 @@ public class PlayerRepository {
 
     public Player getOrCreatePlayer(Long userId) {
         Player player = null;
-        if (!contains(userId) && isRegisteredProcess(getAll())) {
+        if (!contains(userId)) {
             User userById = userRepository.findUserById(userId);
             Boolean isMan = Optional.ofNullable(userById)
                     .map(User::getIsMan)
@@ -44,9 +43,7 @@ public class PlayerRepository {
             player = Player.builder()
                     .id(userId)
                     .name(newPlayerName)
-                    .role(null)
-                    .isAlive(true)
-                    .actionType(ActionType.REGISTERED)
+                    .banEndAt(LocalDateTime.now().minusDays(1))
                     .registeredAt(LocalDateTime.now())
                     .build();
             players.put(userId, player);
@@ -54,15 +51,6 @@ public class PlayerRepository {
             player = players.get(userId);
         }
         return player;
-    }
-
-    private boolean isRegisteredProcess(List<Player> players) {
-        if (players.isEmpty()) {
-            return true;
-        }
-        //todo оставляем пока регистред, потом можно будет поставить size 10 регистеред универсален
-        return players.stream()
-                .allMatch(p -> p.getActionType() == ActionType.REGISTERED);
     }
 
 }

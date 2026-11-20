@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-@Component // Благодаря этому стартер автоматически подхватит и зарегистрирует бота
+@Component
 public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingUpdateConsumer {
 
     private final TelegramProperties telegramProperties;
@@ -26,7 +26,6 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
     private final AtomicLong windowStartMs = new AtomicLong();
     private final AtomicInteger globalCounter = new AtomicInteger();
 
-    // Внедряем ваш существующий WebHookBot и конфигурационные свойства TelegramProperties
     public AnonymizerLongPooling(TelegramProperties telegramProperties, SenderService senderService) {
         this.telegramProperties = telegramProperties;
         this.senderService = senderService;
@@ -39,7 +38,7 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
 
     @Override
     public LongPollingUpdateConsumer getUpdatesConsumer() {
-        return this; // Указываем, что этот же класс будет обрабатывать обновления
+        return this;
     }
 
     @Override

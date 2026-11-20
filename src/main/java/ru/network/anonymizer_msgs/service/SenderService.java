@@ -64,10 +64,14 @@ public class SenderService implements AdminNotifier {
     }
 
     public void handleUserMessage(Message original) {
-        if (isBanned(original)) {
+        Long userId = extractUserId(original);
+        Player player = playerRepository.getOrCreatePlayer(userId);
+
+        if (isBanned(original) || player == null) {
             executeKickUser(original);
             return;
         }
+
         String text = getText(original);
         String senderName = buildSenderName(original);
         String newText = senderName + " " + text;
@@ -158,8 +162,14 @@ public class SenderService implements AdminNotifier {
     }
 
     private void processBan(String banDays, Integer replyToMessageId, Message message) {
-        Integer days = extractBanNumber(banDays);
         Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMessageId);
+
+        if (isCurrentUserAdmin(userId) || isCurrentUserSuperAdmin(userId)) {
+            return;
+        }
+
+        Integer days = extractBanDays(banDays);
+
         Player player = playerRepository.getOrCreatePlayer(userId);
         if (days != null) {
             playerRepository.setBan(days < 30 ? days : 30, userId);
@@ -180,7 +190,7 @@ public class SenderService implements AdminNotifier {
         return "user".equals(text);
     }
 
-    private Integer extractBanNumber(String text) {
+    private Integer extractBanDays(String text) {
         if (text == null || !text.startsWith("бан ")) {
             return null; // просто "бан" или вообще не бан
         }
@@ -337,8 +347,49 @@ public class SenderService implements AdminNotifier {
         return adminIds.contains(message.getFrom().getId());
     }
 
+    private boolean isCurrentUserAdmin(Long userId) {
+        Set<Long> adminIds = telegramProperties.getAdminIds();
+        if (adminIds == null || adminIds.isEmpty()) {
+            return false;
+        }
+        return adminIds.contains(userId);
+    }
+
+    private boolean isCurrentUserSuperAdmin(Long userId) {
+        return SUPERADMIN_ID.equals(userId);
+    }
+
     private boolean isCurrentUserSuperAdmin(Message message) {
         return SUPERADMIN_ID.equals(message.getFrom().getId());
+    }
+
+    /**
+     * Извлекает ID пользователя из сообщения.
+     * @return ID пользователя или null, если отправитель не определен.
+     */
+    private Long extractUserId(Message message) {
+        if (message == null) {
+            return null;
+        }
+
+        // 1. Стандартный случай: сообщение от пользователя (или бота)
+        if (message.getFrom() != null) {
+            return message.getFrom().getId();
+        }
+
+        // 2. Сообщение от анонимного администратора или канала
+        if (message.getSenderChat() != null) {
+            return message.getSenderChat().getId();
+        }
+
+        // 3. Fallback: если это пересланное сообщение, можно взять отправителя оттуда
+        // (хотя обычно getFrom() уже содержит данные)
+        if (message.getForwardFrom() != null) {
+            return message.getForwardFrom().getId();
+        }
+
+        // 4. Если ничего не подошло
+        return null;
     }
 
     /**

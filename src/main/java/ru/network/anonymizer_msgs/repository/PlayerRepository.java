@@ -52,6 +52,10 @@ public class PlayerRepository {
     }
 
     public Player getOrCreatePlayer(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+
         Player player = null;
         if (!contains(userId)) {
             User userById = userRepository.findUserById(userId);

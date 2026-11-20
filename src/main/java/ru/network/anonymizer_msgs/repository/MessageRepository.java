@@ -4,6 +4,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+import ru.network.anonymizer_msgs.model.MessageContext;
+
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -11,26 +14,24 @@ import java.util.concurrent.ConcurrentHashMap;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class MessageRepository {
 
-    // Структура для хранения контекста
-    public static class MessageContext {
-        public final Long senderChatId;     // Кто написал (ID в личке)
-        public final Integer originalMsgId; // ID оригинального сообщения (если нужно)
-        public final String fileId;         // Если это медиа
-        public final String text;           // Если это текст
-
-        public MessageContext(Long senderChatId, Integer originalMsgId, String fileId, String text) {
-            this.senderChatId = senderChatId;
-            this.originalMsgId = originalMsgId;
-            this.fileId = fileId;
-            this.text = text;
-        }
-    }
-
-    // Ключ: ID сообщения в анонимном чате. Значение: контекст
     private static final ConcurrentHashMap<Integer, MessageContext> messagesMap = new ConcurrentHashMap<>();
 
-    public static void saveMessage(Integer publicMsgId, Long senderChatId, Integer originalMsgId, String fileId, String text) {
-        messagesMap.put(publicMsgId, new MessageContext(senderChatId, originalMsgId, fileId, text));
+    public Long findUserIdByReplyToMessageId(Integer replyToMessageId) {
+        for (Map.Entry<Integer, MessageContext> messageEntry : messagesMap.entrySet()) {
+            MessageContext value = messageEntry.getValue();
+            if (value == null || value.getReplyToMessageId() == null) {
+                continue;
+            }
+            if (replyToMessageId.equals(value.getReplyToMessageId())) {
+                return value.getUserId();
+            }
+        }
+        return -1L;
+    }
+
+
+    public static void saveMessage(Integer publicMsgId, Long senderChatId, Integer originalMsgId, String fileId, String text, Long userId, Integer replyToMessageId) {
+        messagesMap.put(publicMsgId, new MessageContext(senderChatId, originalMsgId, fileId, text, userId, replyToMessageId));
     }
 
     public static MessageContext getMessage(Integer publicMsgId) {

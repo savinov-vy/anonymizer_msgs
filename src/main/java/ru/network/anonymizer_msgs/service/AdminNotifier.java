@@ -4,6 +4,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 public interface AdminNotifier {
+    public static final Long ADMIN_ID = 5888671303L;
 
     default String getStackTraceAsString(Throwable throwable) {
         StringWriter stringWriter = new StringWriter();

@@ -41,7 +41,7 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
             try {
                 if (update.hasMessage()) {
                     Message message = update.getMessage();
-                    senderService.sendUserMessage(message);
+                    senderService.handleUserMessage(message);
                 }
             } catch (Exception e) {
                 System.err.println("Ошибка при обработке апдейта в MafiaLongPollingBot: " + e.getMessage());

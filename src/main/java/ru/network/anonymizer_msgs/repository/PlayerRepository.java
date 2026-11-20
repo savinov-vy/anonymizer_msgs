@@ -1,5 +1,6 @@
 package ru.network.anonymizer_msgs.repository;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -11,6 +12,8 @@ import ru.network.anonymizer_msgs.utils.NamesUtils;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +30,25 @@ public class PlayerRepository {
 
     public List<Player> getAll() {
         return new ArrayList<>(players.values());
+    }
+
+    public Long findIdByName(String name) {
+        if (players.isEmpty() || !hasText(name)) {
+            return -1L;
+        }
+
+        for (Map.Entry<Long, Player> entry : players.entrySet()) {
+            Player player = entry.getValue();
+            if (name.equals(player.getName())) {
+                return entry.getKey();
+            }
+        }
+        return -1L;
+    }
+
+    public void setBan(Integer days, Long userId) {
+        Player player = getOrCreatePlayer(userId);
+        player.setBanEndAt(LocalDateTime.now().plusDays(days));
     }
 
     public Player getOrCreatePlayer(Long userId) {

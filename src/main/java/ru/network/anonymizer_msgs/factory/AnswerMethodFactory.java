@@ -39,7 +39,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
-                .protectContent(true)
+                .protectContent(false)
                 .build();
     }
 
@@ -54,7 +54,7 @@ public class AnswerMethodFactory {
                 .replyMarkup(keyboard)
                 .disableNotification(true)
                 .disableWebPagePreview(true)
-                .protectContent(true)
+                .protectContent(false)
                 .build();
     }
 
@@ -80,7 +80,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
-                .protectContent(true)
+                .protectContent(false)
                 .parseMode(ParseMode.HTML)
                 .build();
     }
@@ -162,7 +162,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
-                .protectContent(true)
+                .protectContent(false)
                 .build();
     }
 
@@ -172,7 +172,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
-                .protectContent(true)
+                .protectContent(false)
                 .build();
     }
 
@@ -210,7 +210,7 @@ public class AnswerMethodFactory {
                 .caption(text)
                 .photo(new InputFile(fileId))
                 .replyMarkup(keyboard)
-                .protectContent(true)
+                .protectContent(false)
                 .build();
     }
 

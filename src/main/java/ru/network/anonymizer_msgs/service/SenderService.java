@@ -40,7 +40,7 @@ public class SenderService implements AdminNotifier {
 
 
     public void wrapAndSend(Message message) {
-        notificationExecutor.execute(() -> sendUserMessage(message));
+        notificationExecutor.execute(() -> handleUserMessage(message));
     }
 
     /**
@@ -58,19 +58,28 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
-    public void sendUserMessage(Message original) {
+    public void handleUserMessage(Message original) {
         if (isBanned(original)) {
             executeKickUser(original);
             return;
         }
-
+        String text = getText(original);
         String senderName = buildSenderName(original);
-        // Получаем текст (подпись для медиа или сам текст)
-        String text = original.getText() != null ? original.getText() : original.getCaption() != null ? original.getCaption() : "";
         String newText = senderName + "\n" + text;
-
         // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
+
+        if (isBanText(text) && replyToMsgId != null) {
+            processBan(text, replyToMsgId);
+            executeDeleteMessage(original);
+            return;
+        }
+
+        if (isUserText(text) && replyToMsgId != null) {
+            processSendId(replyToMsgId);
+            executeDeleteMessage(original);
+            return;
+        }
 
         Message sentMessage = null;
 
@@ -114,8 +123,10 @@ public class SenderService implements AdminNotifier {
                         sentMessage.getMessageId(),
                         original.getChatId(),
                         original.getMessageId(),
-                        fileIdToSave,               // Сохраняем fileId
-                        text                        // Сохраняем текст
+                        fileIdToSave,
+                        text,
+                        original.getFrom().getId(),
+                        replyToMsgId
                 );
             }
 
@@ -135,6 +146,43 @@ public class SenderService implements AdminNotifier {
             }
             return null;
         });
+    }
+
+    private void processSendId(Integer replyToMsgId) {
+        Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMsgId);
+        sendHTMLMessage("ID пользователя", ADMIN_ID);
+        sendHTMLMessage(userId + "", ADMIN_ID);
+    }
+
+    private void processBan(String text, Integer replyToMessageId) {
+        Integer days = extractBanNumber(text);
+        Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMessageId);
+        if (days != null) {
+            playerRepository.setBan(days < 30 ? days : 30, userId);
+        } else {
+            playerRepository.setBan(30, userId);
+        }
+    }
+
+    private boolean isBanText(String text) {
+        if (text == null) return false;
+        return text.matches("бан( [1-9]\\d{0,9})?");
+    }
+
+    private boolean isUserText(String text) {
+        if (text == null) return false;
+        return "user".equals(text);
+    }
+
+    private Integer extractBanNumber(String text) {
+        if (text == null || !text.startsWith("бан ")) {
+            return null; // просто "бан" или вообще не бан
+        }
+        try {
+            return Integer.parseInt(text.substring(4)); // после "бан "
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private DeleteMessage getDeleteMessage(Message message) {
@@ -170,6 +218,14 @@ public class SenderService implements AdminNotifier {
             }
             return null;
         });
+    }
+
+    private String getText(Message message) {
+        return message.getText() != null
+                ? message.getText()
+                : message.getCaption() != null
+                ? message.getCaption()
+                : "";
     }
 
     private boolean isBanned(Message message) {

@@ -4,17 +4,12 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
-import org.telegram.telegrambots.meta.api.methods.CopyMessage;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
-import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
@@ -22,10 +17,8 @@ import ru.network.anonymizer_msgs.model.MediaMsgModel;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
-import java.io.Serializable;
-import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Service
 @RequiredArgsConstructor
@@ -34,24 +27,17 @@ public class SenderService implements AdminNotifier {
 
     TelegramClient telegramClient;
     PlayerRepository playerRepository;
-    MafiaClientService mafiaClientService;
+    Executor notificationExecutor;
 
     private static final Long CHAT_ID = -1004434014698L;
-    private static final Integer TOPIC_MAFIA_ID = 5;
 
-    // ================== системные/простые отправки ==================
+    // ================== системные/простые отправки =================
 
-    /**
-     * Отправляет системное сообщение и возвращает messageId.
-     */
-    public Optional<Integer> sendSystemMessage(String chatId, String text) {
-        SendMessage sendMessage = SendMessage.builder()
-                .chatId(chatId)
-                .text(text)
-                .build();
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
+
+    public void wrapAndSend(Message message) {
+        notificationExecutor.execute(() -> sendUserMessage(message));
     }
+
 
     /**
      * Отправляет сообщение и возвращает messageId.
@@ -62,194 +48,38 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
-    /**
-     * Отправляет сообщение в канал/чат по имени и возвращает messageId.
-     */
-    public Optional<Integer> sentMessage(String text, String channelName) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(channelName, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
-
-    /**
-     * Отправляет сообщение с клавиатурой и возвращает messageId.
-     */
-    public Optional<Integer> sentMessage(String text, Long chatId, ReplyKeyboardMarkup keyboardMarkup) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(chatId, text, keyboardMarkup);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
-
     public Optional<Integer> sendHTMLMessage(String text, Long chatId) {
         SendMessage sendMessage = AnswerMethodFactory.getHTMLSendMessage(chatId, text, null);
         return execute(() -> telegramClient.execute(sendMessage))
                 .map(Message::getMessageId);
     }
 
-    public Optional<Integer> sendRedirectableMsg(String text, Long chatId) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
+    public void sendUserMessage(Message original) {
+        String senderName = buildSenderName(original);
+        String originalText = original.getText() != null ? original.getText() : "";
+        String newText = senderName + "\n" + originalText;
 
-    // ================== MAFIA ==================
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                CHAT_ID, newText, null);
+        execute(() -> telegramClient.execute(sendMessage));
 
-    public Optional<Integer> sendMafiaMessage(String text) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(CHAT_ID, TOPIC_MAFIA_ID, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
-
-    public Optional<Integer> editMafiaMessage(String text, Integer messageId) {
-        EditMessageText editMessage = AnswerMethodFactory.getEditMessage(CHAT_ID, messageId, text, null);
-        return executeGeneric(editMessage).map(m -> m instanceof Message msg ? msg.getMessageId() : null);
-    }
-
-    public void sendUserMafiaMessage(Message original) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                // Префикс с именем отправителя
-                String senderName = buildSenderName(original);
-                String originalText = original.getText() != null ? original.getText() : "";
-                String newText = senderName + "\n" + originalText;
-
-                // Отправляем в топик мафии
-                SendMessage sendMessage = AnswerMethodFactory.getSendMessage(
-                        CHAT_ID, TOPIC_MAFIA_ID, newText, null);
-                execute(() -> telegramClient.execute(sendMessage));
-
-                // Удаляем оригинал
-                DeleteMessage deleteMessage = DeleteMessage.builder()
-                        .chatId(CHAT_ID)
-                        .messageId(original.getMessageId())
-                        .build();
-                execute(() -> telegramClient.execute(deleteMessage));
-            } catch (Exception e) {
-                System.err.println("Ошибка зеркалирования: " + e.getMessage());
-            }
-        });
+        // Удаляем оригинал
+        DeleteMessage deleteMessage = DeleteMessage.builder()
+                .chatId(CHAT_ID)
+                .messageId(original.getMessageId())
+                .build();
+        execute(() -> telegramClient.execute(deleteMessage));
     }
 
     private String buildSenderName(Message message) {
         User from = message.getFrom();
         if (from == null) return "Неизвестный:";
-        Player byId = playerRepository.findById(from.getId());
+        Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "Неизвестный:";
         String name = byId.getName();
         return "От " + name + ":";
     }
 
-    public Optional<Integer> sendMafiaMessage(Integer messageId) {
-        CompletableFuture.runAsync(() -> {
-            try {
-                CopyMessage copyMessage = CopyMessage.builder()
-                        .fromChatId(CHAT_ID)
-                        .messageId(messageId)
-                        .chatId(CHAT_ID)
-                        .disableNotification(true)
-                        .messageThreadId(TOPIC_MAFIA_ID)
-                        .build();
-                execute(() -> telegramClient.execute(copyMessage));
-
-                DeleteMessage deleteMessage = DeleteMessage.builder()
-                        .chatId(CHAT_ID)
-                        .messageId(messageId)
-                        .build();
-                execute(() -> telegramClient.execute(deleteMessage));
-            } catch (Exception e) {
-                System.err.println("Ошибка одиночного зеркалирования: " + e.getMessage());
-            }
-        });
-        return Optional.empty();
-    }
-
-    // ================== низкоуровневые ==================
-
-    /**
-     * Отправляет любой BotApiMethod и возвращает результат (Message, если метод его возвращает).
-     */
-    public <T extends Serializable> Optional<T> sendNowPrivate(BotApiMethod<T> toSend) {
-        return execute(() -> telegramClient.execute(toSend));
-    }
-
-    /**
-     * Отправляет SendMessage и возвращает Message (можно получить messageId).
-     */
-    public Optional<Message> sendNowChat(SendMessage message) {
-        return execute(() -> telegramClient.execute(message));
-    }
-
-    /**
-     * Отправляет текст пользователю и возвращает messageId.
-     * отправка прямо в личку в Love38Bot
-     */
-    public Optional<Integer> sendNowPrivate(String text, Long toUserId) {
-        SendMessage message = AnswerMethodFactory.getSendMessage(toUserId, text, null);
-        return execute(() -> telegramClient.execute(message))
-                .map(Message::getMessageId);
-    }
-
-    /**
-     * Отправляет текст пользователю и возвращает messageId.
-     */
-    public void sendNowPrivate(String text, List<Player> toUsers) {
-        for (Player p : toUsers) {
-            SendMessage message = AnswerMethodFactory.getSendMessage(p.getId(), text, null);
-            executeGeneric(message);
-            sleep();
-        }
-    }
-
-    /**
-     * Отправить сообщение первая ночь для мафии
-     */
-    public void sendFirstNightPrivate() {
-        mafiaClientService.sendFirstNightUsers();
-    }
-
-    public Optional<Message> sendNowPrivate(SendVideo message) {
-        return execute(() -> telegramClient.execute(message));
-    }
-
-    // ================== Media ==================
-
-    /**
-     * Отправляет медиа-модель. Возвращает messageId последнего успешно отправленного сообщения
-     * (или пусто, если ничего не отправлялось).
-     */
-    public Optional<Integer> sendNowPrivate(MediaMsgModel message) {
-        if (!(hasPhotoMsg(message)
-                || hasApiMsg(message)
-                || hasMedeaGroup(message)
-                || hasVideoMsg(message))) {
-            return Optional.empty();
-        }
-
-        Optional<Integer> lastMessageId = Optional.empty();
-
-        if (hasPhotoMsg(message)) {
-            for (SendPhoto photo : message.getPhotoResponses()) {
-                lastMessageId = execute(() -> telegramClient.execute(photo))
-                        .map(Message::getMessageId);
-            }
-        }
-
-        if (hasVideoMsg(message)) {
-            for (SendVideo video : message.getVideoResponses()) {
-                lastMessageId = execute(() -> telegramClient.execute(video))
-                        .map(Message::getMessageId);
-            }
-        }
-
-        if (hasApiMsg(message)) {
-            for (BotApiMethod<?> answer : message.getBotApiMethods()) {
-                lastMessageId = executeGeneric(answer)
-                        .map(m -> m instanceof Message msg ? msg.getMessageId() : null);
-            }
-        }
-
-        return lastMessageId;
-    }
 
     // ================== вспомогательное ==================
 
@@ -277,7 +107,8 @@ public class SenderService implements AdminNotifier {
     private void sleep() {
         try {
             Thread.sleep(100);
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
     }
 
 
@@ -315,10 +146,6 @@ public class SenderService implements AdminNotifier {
             System.err.println("Ошибка Telegram API: " + e.getMessage());
             return Optional.empty();
         }
-    }
-
-    private void sendPrivateToMainBot() {
-
     }
 
     /**

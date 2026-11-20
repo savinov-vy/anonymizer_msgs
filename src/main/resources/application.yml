@@ -1,1 +1,51 @@
-spring.application.name=anonymizer_msgs
+server:
+  port: 8211
+
+spring:
+  jpa:
+    properties.hibernate:
+      dialect: org.hibernate.dialect.PostgreSQLDialect
+      hibernate:
+        jdbc:
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: validate
+  jooq:
+    sql-dialect: POSTGRES
+  threads:
+    virtual:
+      enabled: true
+
+
+  logging:
+    level:
+      liquibase: DEBUG
+      org.springframework.boot.autoconfigure.liquibase: DEBUG
+      org.springframework.jdbc.datasource: DEBUG
+      org.springframework.jdbc.core: DEBUG
+      org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+      logging.level.org.hibernate.SQL: DEBUG
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${POSTGRES_URL:localhost:5434}/network_db
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+
+telegrambots:
+  bot-token: ${BOT_TOKEN}
+  adminPassword: ${ADMIN_PASSWORD}
+  isBotEnabled: ${BOT_ENABLED:true}
+  channel-name: ${CHANNEL_NAME}
+  bot-name: ${BOT_NAME}
+  promo-reels-id: ${PROMO_REELS_ID:}
+  img-template-man: 'AgACAgIAAxkBAALGlGrcPWsln3rzOdSQxUUd8qNtZzNyAAIoH2sbcXDhSqqh9QXngK3iAQADAgADeAADPQQ'
+  img-template-woman: 'AgACAgIAAxkBAALGk2rcPRd9Ntl7aaxcq1KtFQyi6L1vAAInH2sbcXDhSqL26vne0T8fAQADAgADeAADPQQ'

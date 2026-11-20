@@ -6,20 +6,22 @@ import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsume
 import org.telegram.telegrambots.longpolling.starter.AfterBotRegistration;
 import org.telegram.telegrambots.longpolling.starter.SpringLongPollingBot;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.message.Message;
 import ru.network.anonymizer_msgs.config.TelegramProperties;
+import ru.network.anonymizer_msgs.service.SenderService;
 
 import java.util.List;
 
 @Component // Благодаря этому стартер автоматически подхватит и зарегистрирует бота
 public class MafiaLongPollingBot implements SpringLongPollingBot, LongPollingUpdateConsumer {
 
-    private final WebHookBot webHookBot;
     private final TelegramProperties telegramProperties;
+    private final SenderService senderService;
 
     // Внедряем ваш существующий WebHookBot и конфигурационные свойства TelegramProperties
-    public MafiaLongPollingBot(WebHookBot webHookBot, TelegramProperties telegramProperties) {
-        this.webHookBot = webHookBot;
+    public MafiaLongPollingBot(TelegramProperties telegramProperties, SenderService senderService) {
         this.telegramProperties = telegramProperties;
+        this.senderService = senderService;
     }
 
     @Override
@@ -37,7 +39,10 @@ public class MafiaLongPollingBot implements SpringLongPollingBot, LongPollingUpd
         // Передаем входящие сообщения в ваш готовый handleUpdate контроллера WebHookBot
         for (Update update : updates) {
             try {
-                webHookBot.handleUpdate(update);
+                if (update.hasMessage() && update.getMessage().hasText()) {
+                    Message message = update.getMessage();
+                    senderService.sendUserMessage(message);
+                }
             } catch (Exception e) {
                 System.err.println("Ошибка при обработке апдейта в MafiaLongPollingBot: " + e.getMessage());
             }

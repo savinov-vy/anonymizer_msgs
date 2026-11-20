@@ -6,6 +6,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.BanChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
@@ -22,6 +23,7 @@ import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.MessageRepository;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 
@@ -56,9 +58,12 @@ public class SenderService implements AdminNotifier {
                 .map(Message::getMessageId);
     }
 
-// Инжектим ваш репозиторий
-
     public void sendUserMessage(Message original) {
+        if (isBanned(original)) {
+            executeKickUser(original);
+            return;
+        }
+
         String senderName = buildSenderName(original);
         // Получаем текст (подпись для медиа или сам текст)
         String text = original.getText() != null ? original.getText() : original.getCaption() != null ? original.getCaption() : "";
@@ -100,7 +105,8 @@ public class SenderService implements AdminNotifier {
             if (sentMessage != null) {
                 // Определяем fileId для сохранения (если это медиа)
                 String fileIdToSave = null;
-                if (original.hasPhoto()) fileIdToSave = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
+                if (original.hasPhoto())
+                    fileIdToSave = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
                 else if (original.hasVideo()) fileIdToSave = original.getVideo().getFileId();
                 else if (original.hasVoice()) fileIdToSave = original.getVoice().getFileId();
 
@@ -119,10 +125,7 @@ public class SenderService implements AdminNotifier {
         }
 
         // --- УДАЛЕНИЕ ОРИГИНАЛА ---
-        DeleteMessage deleteMessage = DeleteMessage.builder()
-                .chatId(String.valueOf(original.getChatId()))
-                .messageId(original.getMessageId())
-                .build();
+        DeleteMessage deleteMessage = getDeleteMessage(original);
 
         execute(() -> {
             try {
@@ -133,6 +136,51 @@ public class SenderService implements AdminNotifier {
             return null;
         });
     }
+
+    private DeleteMessage getDeleteMessage(Message message) {
+        return DeleteMessage.builder()
+                .chatId(String.valueOf(message.getChatId()))
+                .messageId(message.getMessageId())
+                .build();
+    }
+
+    private void executeDeleteMessage(Message message) {
+        execute(() -> {
+            try {
+                telegramClient.execute(getDeleteMessage(message));
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при удалении сообщения", e);
+            }
+            return null;
+        });
+    }
+
+    private void executeKickUser(Message message) {
+        Long userId = message.getFrom().getId();
+        BanChatMember banChatMember = BanChatMember.builder()
+                .chatId(String.valueOf(message.getChatId()))
+                .userId(userId)
+                .revokeMessages(true)
+                .build();
+        execute(() -> {
+            try {
+                telegramClient.execute(banChatMember);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при удалении сообщения", e);
+            }
+            return null;
+        });
+    }
+
+    private boolean isBanned(Message message) {
+        User from = message.getFrom();
+        if (from == null) return true;
+        Player player = playerRepository.getOrCreatePlayer(from.getId());
+        return Optional.ofNullable(player.getBanEndAt())
+                .map(end -> LocalDateTime.now().isBefore(end))
+                .orElse(false);
+    }
+
 
     private Integer getReplyToMessage(Message message) {
         if (message.isReply()) {

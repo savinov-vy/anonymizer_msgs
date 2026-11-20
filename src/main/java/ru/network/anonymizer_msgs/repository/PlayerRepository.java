@@ -43,7 +43,7 @@ public class PlayerRepository {
             player = Player.builder()
                     .id(userId)
                     .name(newPlayerName)
-                    .banEndAt(LocalDateTime.now().minusDays(1))
+                    .banEndAt(userById.getBannedDate() != null ? userById.getBannedDate() : LocalDateTime.now().minusDays(1))
                     .registeredAt(LocalDateTime.now())
                     .build();
             players.put(userId, player);

@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
+import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -57,40 +60,67 @@ public class SenderService implements AdminNotifier {
 
     public void sendUserMessage(Message original) {
         String senderName = buildSenderName(original);
-        String originalText = original.getText() != null ? original.getText() : "";
-        String newText = senderName + "\n" + originalText;
+        // Получаем текст (подпись для медиа или сам текст)
+        String text = original.getText() != null ? original.getText() : original.getCaption() != null ? original.getCaption() : "";
+        String newText = senderName + "\n" + text;
 
-        // 1. Формируем сообщение (отвечаем на original.getMessageId())
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
-                original.getChatId(),
-                getReplyToMessage(original), // Теперь replyParameters будет работать
-                newText,
-                null
-        );
+        // Получаем ID сообщения, на которое отвечаем (если это Reply)
+        Integer replyToMsgId = getReplyToMessage(original);
 
-        // 2. Отправляем СИНХРОННО, чтобы получить ID нового сообщения
+        Message sentMessage = null;
+
         try {
-            Message sentMessage = telegramClient.execute(sendMessage);
+            // --- ЛОГИКА ОПРЕДЕЛЕНИЯ ТИПА ---
+            if (original.hasPhoto()) {
+                String fileId = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
+                SendPhoto sendPhoto = AnswerMethodFactory.getSendPhotoRedirectable(
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                sentMessage = telegramClient.execute(sendPhoto);
 
-            // 3. Сохраняем в Map: ID нового сообщения в чате -> контекст пользователя
+            } else if (original.hasVideo()) {
+                String fileId = original.getVideo().getFileId();
+                SendVideo sendVideo = AnswerMethodFactory.getSendVideoRedirectable(
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                sentMessage = telegramClient.execute(sendVideo);
+
+            } else if (original.hasVoice()) {
+                String fileId = original.getVoice().getFileId();
+                SendVoice sendVoice = AnswerMethodFactory.getSendVoiceRedirectable(
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                sentMessage = telegramClient.execute(sendVoice);
+
+            } else if (original.hasText()) {
+                // Ваш старый метод для текста
+                SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                        original.getChatId(), replyToMsgId, newText, null);
+                sentMessage = telegramClient.execute(sendMessage);
+            }
+
+            // --- СОХРАНЕНИЕ В MAP ---
             if (sentMessage != null) {
+                // Определяем fileId для сохранения (если это медиа)
+                String fileIdToSave = null;
+                if (original.hasPhoto()) fileIdToSave = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
+                else if (original.hasVideo()) fileIdToSave = original.getVideo().getFileId();
+                else if (original.hasVoice()) fileIdToSave = original.getVoice().getFileId();
+
                 messageRepository.saveMessage(
-                        sentMessage.getMessageId(), // ID сообщения в анонимном чате
-                        original.getChatId(),       // Кому отвечать (ID в личке)
-                        original.getMessageId(),    // ID в личке
-                        null,                       // fileId (пока null, т.к. только текст)
-                        originalText
+                        sentMessage.getMessageId(),
+                        original.getChatId(),
+                        original.getMessageId(),
+                        fileIdToSave,               // Сохраняем fileId
+                        text                        // Сохраняем текст
                 );
             }
+
         } catch (TelegramApiException e) {
             log.error("Ошибка при отправке сообщения", e);
-            // Если не удалось отправить — прерываем выполнение, чтобы не удалять оригинал
-            return;
+            return; // Прерываем, чтобы не удалять оригинал
         }
 
-        // 4. Удаляем оригинал (делаем это ПОСЛЕ успешной отправки)
+        // --- УДАЛЕНИЕ ОРИГИНАЛА ---
         DeleteMessage deleteMessage = DeleteMessage.builder()
-                .chatId(String.valueOf(original.getChatId())) // telegramClient ожидает String
+                .chatId(String.valueOf(original.getChatId()))
                 .messageId(original.getMessageId())
                 .build();
 

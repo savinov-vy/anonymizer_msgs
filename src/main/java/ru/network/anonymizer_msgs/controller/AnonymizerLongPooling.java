@@ -39,7 +39,7 @@ public class AnonymizerLongPooling implements SpringLongPollingBot, LongPollingU
         // Передаем входящие сообщения в ваш готовый handleUpdate контроллера WebHookBot
         for (Update update : updates) {
             try {
-                if (update.hasMessage() && update.getMessage().hasText()) {
+                if (update.hasMessage()) {
                     Message message = update.getMessage();
                     senderService.sendUserMessage(message);
                 }

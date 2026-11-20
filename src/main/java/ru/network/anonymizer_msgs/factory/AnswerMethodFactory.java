@@ -6,6 +6,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
+import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
@@ -93,6 +94,45 @@ public class AnswerMethodFactory {
                 .protectContent(false)
                 .build();
     }
+
+    // Для фото
+    public static SendPhoto getSendPhotoRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+        return SendPhoto.builder()
+                .chatId(String.valueOf(chatId))
+                .photo(new InputFile(fileId))
+                .caption(caption)
+                .replyMarkup(keyboard)
+                .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
+                .protectContent(false)
+                .build();
+    }
+
+    // Для видео
+    public static SendVideo getSendVideoRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+        return SendVideo.builder()
+                .chatId(String.valueOf(chatId))
+                .video(new InputFile(fileId))
+                .caption(caption)
+                .replyMarkup(keyboard)
+                .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
+                .protectContent(false)
+                .build();
+    }
+
+    // Для голосовых
+    public static SendVoice getSendVoiceRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+        return SendVoice.builder()
+                .chatId(String.valueOf(chatId))
+                .voice(new InputFile(fileId))
+                .caption(caption)
+                .replyMarkup(keyboard)
+                .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
+                .protectContent(false)
+                .build();
+    }
+
+    // Ваш старый метод для текста оставляем
+
 
     public static SendMessage getSendMessageRedirectable(
             Long chatId,
@@ -208,8 +248,8 @@ public class AnswerMethodFactory {
      * EditMessageText - метод для редактирования текста и клавиатуры сообщения
      */
     public static EditMessageText getEditMessageText(CallbackQuery callbackQuery,
-                                              String newText,
-                                              InlineKeyboardMarkup keyboard) {
+                                                     String newText,
+                                                     InlineKeyboardMarkup keyboard) {
         return EditMessageText.builder()
                 .chatId(String.valueOf(callbackQuery.getMessage().getChatId()))
                 .messageId(callbackQuery.getMessage().getMessageId())
@@ -220,8 +260,8 @@ public class AnswerMethodFactory {
     }
 
     public static SendMediaGroup getMediaGroup(Long chatId, String caption,
-                                        List<String> photoIds,
-                                        List<String> videoIds) {
+                                               List<String> photoIds,
+                                               List<String> videoIds) {
 
         List<InputMedia> media = new ArrayList<>();
 

@@ -9,10 +9,26 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class NamesUtils {
 
-    private static final List<String> ANIMAL_EMOJIS = List.of(
-            "🐶", "🐱", "🐭", "🐰", "🦊", "🐻", "🐼", "🐯",
-            "🦁", "🐮", "🐧", "🐤", "🐴", "🐝", "🐌", "🐢",
-            "🐍", "🦎", "🦞", "🦀", "🐠", "🐬", "🦈", "🐊");
+
+    private static final List<String> EMOJI_MAN = List.of(
+            "\uD83D\uDC71\u200D♂\uFE0F",
+            "\uD83D\uDC68\u200D\uD83D\uDCBC",
+            "\uD83D\uDC68\u200D\uD83D\uDD27",
+            "\uD83D\uDE4B\u200D♂\uFE0F",
+            "\uD83E\uDD35\u200D♂\uFE0F",
+            "\uD83D\uDD7A",
+            "\uD83E\uDD34"
+    );
+
+    private static final List<String> EMOJI_WOMAN = List.of(
+            "\uD83D\uDC67",
+            "\uD83D\uDC83",
+            "\uD83D\uDC69",
+            "\uD83D\uDC69\u200D⚖\uFE0F",
+            "\uD83D\uDC78",
+            "\uD83D\uDC70\u200D♀\uFE0F",
+            "\uD83D\uDC81\u200D♀\uFE0F"
+    );
 
     private static final List<String> WOMAN_NAMES = List.of(
             "Nika", "Mira", "Lana", "Kira", "Zara",
@@ -84,9 +100,9 @@ public class NamesUtils {
                 .map(User::getIsMan)
                 .orElse(false);
         if (isMan) {
-            return getRandom(ANIMAL_EMOJIS) + " " + getRandom(MAN_NAMES);
+            return getRandom(EMOJI_MAN) + " " + getRandom(MAN_NAMES);
         } else {
-            return getRandom(ANIMAL_EMOJIS) + " " + getRandom(WOMAN_NAMES);
+            return getRandom(EMOJI_WOMAN) + " " + getRandom(WOMAN_NAMES);
         }
     }
 

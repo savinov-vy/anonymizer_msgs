@@ -3,12 +3,9 @@ package ru.network.anonymizer_msgs.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import ru.network.anonymizer_msgs.type.ActionType;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Data
 @Entity
@@ -92,13 +89,6 @@ public class User {
     Boolean isBotBlocked;
 
     /**
-     * Текущее действие (состояние)
-     */
-    @Column(name = "action_type")
-    @Enumerated(EnumType.STRING)
-    ActionType actionType;
-
-    /**
      * текущая просматриваемая анкета
      * поле добавляется во время отправки
      * анкеты пользователю
@@ -146,28 +136,5 @@ public class User {
      */
     @Column(name = "is_anon_active")
     Boolean isAnonActive;
-
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-            name = "black_list", // Имя таблицы для хранения значений
-            joinColumns = @JoinColumn(name = "user_id") // Внешний ключ на MyEntity
-    )
-    @Column(name = "black_user_id") // Имя колонки для самого Long
-    private Set<Long> blackUserIds = new HashSet<>();
-
-
-    /**
-     * сущность для хранения тех людей,
-     * рилсы которых смотрятся в первую очередь
-     * даже если эти люди скрыли себя от посторонних
-     */
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-            name = "white_list", // Имя таблицы для хранения значений
-            joinColumns = @JoinColumn(name = "user_id") // Внешний ключ на MyEntity
-    )
-    @Column(name = "white_user_id") // Имя колонки для самого Long
-    private Set<Long> whiteUserIds = new HashSet<>();
-
 
 }

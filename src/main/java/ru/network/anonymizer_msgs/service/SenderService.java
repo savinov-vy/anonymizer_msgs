@@ -29,7 +29,7 @@ public class SenderService implements AdminNotifier {
     PlayerRepository playerRepository;
     Executor notificationExecutor;
 
-    private static final Long CHAT_ID = -1004434014698L;
+    private static final Long CHAT_ID = -1004470617675L;
 
     // ================== системные/простые отправки =================
 

@@ -37,6 +37,7 @@ public class SenderService implements AdminNotifier {
     PlayerRepository playerRepository;
     Executor notificationExecutor;
     private final MessageRepository messageRepository;
+    private static final Long SUPERADMIN_ID = 7380158520L;
 
 
     public void wrapAndSend(Message message) {
@@ -46,14 +47,14 @@ public class SenderService implements AdminNotifier {
     /**
      * Отправляет сообщение и возвращает messageId.
      */
-    public Optional<Integer> sentMessage(String text, Long chatId) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessage(chatId, text, null);
+    public Optional<Integer> sendMessageSuperAdmin(String text) {
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
         return execute(() -> telegramClient.execute(sendMessage))
                 .map(Message::getMessageId);
     }
 
-    public Optional<Integer> sendHTMLMessage(String text, Long chatId) {
-        SendMessage sendMessage = AnswerMethodFactory.getHTMLSendMessage(chatId, text, null);
+    public Optional<Integer> sendChatMessage(String text, Long chatId) {
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
         return execute(() -> telegramClient.execute(sendMessage))
                 .map(Message::getMessageId);
     }
@@ -70,7 +71,7 @@ public class SenderService implements AdminNotifier {
         Integer replyToMsgId = getReplyToMessage(original);
 
         if (isBanText(text) && replyToMsgId != null) {
-            processBan(text, replyToMsgId);
+            processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
             return;
         }
@@ -150,18 +151,21 @@ public class SenderService implements AdminNotifier {
 
     private void processSendId(Integer replyToMsgId) {
         Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMsgId);
-        sendHTMLMessage("ID пользователя", ADMIN_ID);
-        sendHTMLMessage(userId + "", ADMIN_ID);
+        sendMessageSuperAdmin("ID пользователя");
+        sendMessageSuperAdmin(userId + "");
     }
 
-    private void processBan(String text, Integer replyToMessageId) {
-        Integer days = extractBanNumber(text);
+    private void processBan(String banDays, Integer replyToMessageId, Message message) {
+        Integer days = extractBanNumber(banDays);
         Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMessageId);
+        Player player = playerRepository.getOrCreatePlayer(userId);
         if (days != null) {
             playerRepository.setBan(days < 30 ? days : 30, userId);
         } else {
-            playerRepository.setBan(30, userId);
+            playerRepository.setBan(3, userId);
         }
+        sendMessageSuperAdmin(String.format("Пользователь userId: [%s]\nКоличество дней бана [%s]", userId, banDays));
+        sendChatMessage(String.format("Пользователь: [%s]\nКоличество дней бана [%s]", player.getName(), banDays), message.getChatId());
     }
 
     private boolean isBanText(String text) {
@@ -242,7 +246,7 @@ public class SenderService implements AdminNotifier {
         if (message.isReply()) {
             Message repliedTo = message.getReplyToMessage();
 
-            return repliedTo.getMessageId(); // 71
+            return repliedTo.getMessageId();
         }
         return null;
     }
@@ -281,7 +285,7 @@ public class SenderService implements AdminNotifier {
 
     private void sleep() {
         try {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         } catch (Exception e) {
         }
     }

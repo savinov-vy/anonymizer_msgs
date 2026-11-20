@@ -15,4 +15,5 @@ public class Player {
      */
     private LocalDateTime banEndAt;
     private LocalDateTime registeredAt;
+    private Boolean isAdmin;
 }

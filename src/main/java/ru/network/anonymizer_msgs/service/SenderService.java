@@ -160,7 +160,11 @@ public class SenderService implements AdminNotifier {
     }
 
     private void processSendId(Integer replyToMsgId) {
-        Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMsgId);
+        MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMsgId);
+
+        Long userId = Optional.ofNullable(messageContext)
+                .map(MessageContext::getUserId)
+                .orElse(null);
         sendMessageSuperAdmin("ID пользователя");
         sendMessageSuperAdmin(userId + "");
     }
@@ -183,7 +187,7 @@ public class SenderService implements AdminNotifier {
             days = days < 30 ? days : 30;
             playerRepository.setBan(days, userId);
         } else {
-            days = 3;
+            days = 1;
             playerRepository.setBan(days, userId);
         }
         sendMessageSuperAdmin(String.format("Пользователь userId: [%s]\nКоличество дней бана [%d]", userId, days));
@@ -240,7 +244,6 @@ public class SenderService implements AdminNotifier {
         BanChatMember banChatMember = BanChatMember.builder()
                 .chatId(String.valueOf(chatId))
                 .userId(userId)
-                .revokeMessages(true) // удалит сообщения пользователя (по желанию)
                 .build();
 
         UnbanChatMember unbanChatMember = UnbanChatMember.builder()
@@ -268,7 +271,6 @@ public class SenderService implements AdminNotifier {
         BanChatMember banChatMember = BanChatMember.builder()
                 .chatId(chatId)
                 .userId(userId)
-                .revokeMessages(true)
                 .build();
 
         UnbanChatMember unbanChatMember = UnbanChatMember.builder()

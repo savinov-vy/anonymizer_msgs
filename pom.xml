@@ -9,8 +9,8 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>ru.network</groupId>
-	<artifactId>anonymizer_msgs</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<artifactId>wrapper</artifactId>
+	<version>0.0.1</version>
 	<name/>
 	<description/>
 	<url/>

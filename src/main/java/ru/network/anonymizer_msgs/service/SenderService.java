@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.botapimethods.BotApiMethod;
 import org.telegram.telegrambots.meta.api.methods.groupadministration.BanChatMember;
+import org.telegram.telegrambots.meta.api.methods.groupadministration.UnbanChatMember;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
@@ -20,6 +21,7 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 import ru.network.anonymizer_msgs.config.TelegramProperties;
 import ru.network.anonymizer_msgs.factory.AnswerMethodFactory;
 import ru.network.anonymizer_msgs.model.MediaMsgModel;
+import ru.network.anonymizer_msgs.model.MessageContext;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.MessageRepository;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
@@ -28,6 +30,8 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Service
@@ -44,25 +48,6 @@ public class SenderService implements AdminNotifier {
     private static final Long CHAT_ID = 7380158520L;
 
 
-    public void wrapAndSend(Message message) {
-        notificationExecutor.execute(() -> handleUserMessage(message));
-    }
-
-    /**
-     * Отправляет сообщение и возвращает messageId.
-     */
-    public Optional<Integer> sendMessageSuperAdmin(String text) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
-
-    public Optional<Integer> sendChatMessage(String text, Long chatId) {
-        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
-    }
-
     public void handleUserMessage(Message original) {
         Long userId = extractUserId(original);
         Player player = playerRepository.getOrCreatePlayer(userId);
@@ -78,11 +63,11 @@ public class SenderService implements AdminNotifier {
         // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
 
-        if (isCurrentUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
+        if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
             return;
-        } else if (isCurrentUserSuperAdmin(original) && isUserText(text) && replyToMsgId != null) {
+        } else if (isUserSuperAdmin(original) && isUserText(text) && replyToMsgId != null) {
             processSendId(replyToMsgId);
             executeDeleteMessage(original);
             return;
@@ -155,6 +140,25 @@ public class SenderService implements AdminNotifier {
         });
     }
 
+    public void wrapAndSend(Message message) {
+        notificationExecutor.execute(() -> handleUserMessage(message));
+    }
+
+    /**
+     * Отправляет сообщение и возвращает messageId.
+     */
+    public Optional<Integer> sendMessageSuperAdmin(String text) {
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
+        return execute(() -> telegramClient.execute(sendMessage))
+                .map(Message::getMessageId);
+    }
+
+    public Optional<Integer> sendChatMessage(String text, Long chatId) {
+        SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
+        return execute(() -> telegramClient.execute(sendMessage))
+                .map(Message::getMessageId);
+    }
+
     private void processSendId(Integer replyToMsgId) {
         Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMsgId);
         sendMessageSuperAdmin("ID пользователя");
@@ -162,9 +166,13 @@ public class SenderService implements AdminNotifier {
     }
 
     private void processBan(String banDays, Integer replyToMessageId, Message message) {
-        Long userId = messageRepository.findUserIdByReplyToMessageId(replyToMessageId);
+        MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMessageId);
 
-        if (isCurrentUserAdmin(userId) || isCurrentUserSuperAdmin(userId)) {
+        Long userId = Optional.ofNullable(messageContext)
+                .map(MessageContext::getUserId)
+                .orElse(null);
+
+        if (userId == null || isUserAdmin(userId) || isUserSuperAdmin(userId)) {
             return;
         }
 
@@ -172,27 +180,36 @@ public class SenderService implements AdminNotifier {
 
         Player player = playerRepository.getOrCreatePlayer(userId);
         if (days != null) {
-            playerRepository.setBan(days < 30 ? days : 30, userId);
+            days = days < 30 ? days : 30;
+            playerRepository.setBan(days, userId);
         } else {
-            playerRepository.setBan(3, userId);
+            days = 3;
+            playerRepository.setBan(days, userId);
         }
-        sendMessageSuperAdmin(String.format("Пользователь userId: [%s]\nКоличество дней бана [%s]", userId, banDays));
-        sendChatMessage(String.format("Пользователь: [%s]\nКоличество дней бана [%s]", player.getName(), banDays), message.getChatId());
+        sendMessageSuperAdmin(String.format("Пользователь userId: [%s]\nКоличество дней бана [%d]", userId, days));
+        sendChatMessage(String.format("Пользователь: [ %s ]\nКоличество дней бана [ %d ]", player.getName(), days), message.getChatId());
+        executeKickUser(userId, messageContext.getSenderChatId());
     }
 
     private boolean isBanText(String text) {
-        if (text == null) return false;
+        if (!hasText(text)) return false;
+        text = text.toLowerCase();
         return text.matches("бан( [1-9]\\d{0,9})?");
     }
 
     private boolean isUserText(String text) {
-        if (text == null) return false;
+        if (!hasText(text)) return false;
+        text = text.toLowerCase();
         return "user".equals(text);
     }
 
     private Integer extractBanDays(String text) {
-        if (text == null || !text.startsWith("бан ")) {
+        if (!hasText(text)) {
             return null; // просто "бан" или вообще не бан
+        }
+        text = text.toLowerCase();
+        if (!text.startsWith("бан ")) {
+            return null;
         }
         try {
             return Integer.parseInt(text.substring(4)); // после "бан "
@@ -219,22 +236,58 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    private void executeKickUser(Message message) {
-        Long userId = message.getFrom().getId();
+    private void executeKickUser(Long userId, Long chatId) {
         BanChatMember banChatMember = BanChatMember.builder()
-                .chatId(String.valueOf(message.getChatId()))
+                .chatId(String.valueOf(chatId))
                 .userId(userId)
-                .revokeMessages(true)
+                .revokeMessages(true) // удалит сообщения пользователя (по желанию)
                 .build();
+
+        UnbanChatMember unbanChatMember = UnbanChatMember.builder()
+                .chatId(String.valueOf(chatId))
+                .userId(userId)
+                .onlyIfBanned(true) // снимет бан, но не вернет в чат принудительно
+                .build();
+
         execute(() -> {
             try {
                 telegramClient.execute(banChatMember);
+                telegramClient.execute(unbanChatMember);
             } catch (TelegramApiException e) {
-                log.error("Ошибка при удалении сообщения", e);
+                log.error("Ошибка при кике пользователя {} из чата {}", userId, chatId, e);
             }
             return null;
         });
     }
+
+
+    private void executeKickUser(Message message) {
+        Long userId = message.getFrom().getId();
+        String chatId = String.valueOf(message.getChatId());
+
+        BanChatMember banChatMember = BanChatMember.builder()
+                .chatId(chatId)
+                .userId(userId)
+                .revokeMessages(true)
+                .build();
+
+        UnbanChatMember unbanChatMember = UnbanChatMember.builder()
+                .chatId(chatId)
+                .userId(userId)
+                .onlyIfBanned(true)
+                .build();
+
+        execute(() -> {
+            try {
+                telegramClient.execute(banChatMember);
+                telegramClient.execute(unbanChatMember);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при кике пользователя {} из чата {}", userId, chatId, e);
+            }
+            return null;
+        });
+    }
+
 
     private String getText(Message message) {
         return message.getText() != null
@@ -339,7 +392,7 @@ public class SenderService implements AdminNotifier {
         }
     }
 
-    private boolean isCurrentUserAdmin(Message message) {
+    private boolean isUserAdmin(Message message) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
         if (adminIds == null || adminIds.isEmpty()) {
             return false;
@@ -347,7 +400,7 @@ public class SenderService implements AdminNotifier {
         return adminIds.contains(message.getFrom().getId());
     }
 
-    private boolean isCurrentUserAdmin(Long userId) {
+    private boolean isUserAdmin(Long userId) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
         if (adminIds == null || adminIds.isEmpty()) {
             return false;
@@ -355,11 +408,11 @@ public class SenderService implements AdminNotifier {
         return adminIds.contains(userId);
     }
 
-    private boolean isCurrentUserSuperAdmin(Long userId) {
+    private boolean isUserSuperAdmin(Long userId) {
         return SUPERADMIN_ID.equals(userId);
     }
 
-    private boolean isCurrentUserSuperAdmin(Message message) {
+    private boolean isUserSuperAdmin(Message message) {
         return SUPERADMIN_ID.equals(message.getFrom().getId());
     }
 

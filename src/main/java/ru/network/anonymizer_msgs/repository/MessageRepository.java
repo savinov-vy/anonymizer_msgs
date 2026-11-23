@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.network.anonymizer_msgs.model.MessageContext;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -27,6 +28,11 @@ public class MessageRepository {
             }
         }
         return -1L;
+    }
+
+    public MessageContext findMessageContextByMessageId(Integer replyToMessageId) {
+
+        return messagesMap.get(replyToMessageId);
     }
 
 

@@ -1,5 +1,5 @@
 server:
-  port: 8211
+  port: 8221
 
 spring:
   jpa:
@@ -47,5 +47,3 @@ telegrambots:
   channel-name: ${CHANNEL_NAME}
   bot-name: ${BOT_NAME}
   promo-reels-id: ${PROMO_REELS_ID:}
-  img-template-man: 'AgACAgIAAxkBAALGlGrcPWsln3rzOdSQxUUd8qNtZzNyAAIoH2sbcXDhSqqh9QXngK3iAQADAgADeAADPQQ'
-  img-template-woman: 'AgACAgIAAxkBAALGk2rcPRd9Ntl7aaxcq1KtFQyi6L1vAAInH2sbcXDhSqL26vne0T8fAQADAgADeAADPQQ'

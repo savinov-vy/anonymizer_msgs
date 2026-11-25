@@ -61,10 +61,19 @@ public class SenderService implements AdminNotifier {
         String senderName = buildSenderName(original);
         Integer replyToMsgId = getReplyToMessage(original);
 
-        // --- ЦИТАТА ВМЕСТО НАТИВНОГО REPLY ---
-        String quote = (replyToMsgId != null) ? buildQuoteForMessage(replyToMsgId) : "";
+        boolean isMedia = original.hasPhoto() || original.hasVideo() || original.hasVoice();
+
+        // Собираем цитату: для медиа — визуальная в caption, для текста — blockquote в text
+        String quote = "";
+        if (replyToMsgId != null) {
+            quote = isMedia
+                    ? buildMediaQuoteForMessage(replyToMsgId)
+                    : buildTextQuoteForMessage(replyToMsgId);
+        }
+
         String newText = quote + senderName + " " + text;
 
+        // --- команды модерации ---
         if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
@@ -80,23 +89,25 @@ public class SenderService implements AdminNotifier {
         try {
             if (original.hasPhoto()) {
                 String fileId = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
+                // reply передаём — стрелочка как на скриншоте
                 SendPhoto sendPhoto = AnswerMethodFactory.getSendPhotoRedirectable(
-                        original.getChatId(), fileId, newText, null);
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
                 sentMessage = telegramClient.execute(sendPhoto);
 
             } else if (original.hasVideo()) {
                 String fileId = original.getVideo().getFileId();
                 SendVideo sendVideo = AnswerMethodFactory.getSendVideoRedirectable(
-                        original.getChatId(), fileId, newText, null);
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
                 sentMessage = telegramClient.execute(sendVideo);
 
             } else if (original.hasVoice()) {
                 String fileId = original.getVoice().getFileId();
                 SendVoice sendVoice = AnswerMethodFactory.getSendVoiceRedirectable(
-                        original.getChatId(), fileId, newText, null);
+                        original.getChatId(), replyToMsgId, fileId, newText, null);
                 sentMessage = telegramClient.execute(sendVoice);
 
             } else if (original.hasText()) {
+                // для текста reply НЕ передаём — цитата уже в тексте
                 SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
                         original.getChatId(), newText, null);
                 sentMessage = telegramClient.execute(sendMessage);
@@ -136,16 +147,27 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    /**
-     * Строит цитату по messageId ранее переотправленного сообщения.
-     * Имя берём из Player, текст — из MessageContext.
-     */
-    private String buildQuoteForMessage(Integer messageId) {
-        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
-        if (ctx == null) {
-            return "";
-        }
+    // ================== цитаты ==================
 
+    /**
+     * HTML blockquote для текстовых сообщений.
+     */
+    private String buildTextQuoteForMessage(Integer messageId) {
+        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
+        if (ctx == null) return "";
+        return AnswerMethodFactory.buildTextQuote(extractNameFromContext(ctx), ctx.getText());
+    }
+
+    /**
+     * Визуальная цитата « » для caption медиа.
+     */
+    private String buildMediaQuoteForMessage(Integer messageId) {
+        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
+        if (ctx == null) return "";
+        return AnswerMethodFactory.buildMediaQuote(extractNameFromContext(ctx), ctx.getText());
+    }
+
+    private String extractNameFromContext(MessageContext ctx) {
         String name = "[<b>Неизвестный</b>]";
         Long userId = ctx.getUserId();
         if (userId != null) {
@@ -154,10 +176,10 @@ public class SenderService implements AdminNotifier {
                 name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
             }
         }
-
-        String originalText = ctx.getText();
-        return AnswerMethodFactory.buildQuote(name, originalText);
+        return name;
     }
+
+    // ================== публичные отправки ==================
 
     public Optional<Integer> sendMessageSuperAdmin(String text) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
@@ -170,6 +192,8 @@ public class SenderService implements AdminNotifier {
         return execute(() -> telegramClient.execute(sendMessage))
                 .map(Message::getMessageId);
     }
+
+    // ================== модерация ==================
 
     private void processSendId(Integer replyToMsgId) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMsgId);
@@ -233,6 +257,8 @@ public class SenderService implements AdminNotifier {
             return null;
         }
     }
+
+    // ================== удаление / кик ==================
 
     private DeleteMessage getDeleteMessage(Message message) {
         return DeleteMessage.builder()
@@ -301,6 +327,8 @@ public class SenderService implements AdminNotifier {
         });
     }
 
+    // ================== хелперы ==================
+
     private String getText(Message message) {
         return message.getText() != null
                 ? message.getText()
@@ -334,8 +362,6 @@ public class SenderService implements AdminNotifier {
         String name = byId.getName();
         return "[<b>" + AnswerMethodFactory.escapeHtml(name) + "</b>]";
     }
-
-    // ================== вспомогательное ==================
 
     private boolean hasPhotoMsg(MediaMsgModel message) {
         return Optional.ofNullable(message)

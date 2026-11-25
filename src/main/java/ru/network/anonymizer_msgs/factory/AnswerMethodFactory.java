@@ -9,6 +9,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
+import org.telegram.telegrambots.meta.api.objects.ReplyParameters;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
@@ -24,9 +25,10 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class AnswerMethodFactory {
 
-    private static final int MAX_QUOTE_LENGTH = 300;
+    private static final int MAX_TEXT_QUOTE_LENGTH = 300;
+    private static final int MAX_MEDIA_QUOTE_LENGTH = 150;
 
-    // ================== ЦИТАТА ==================
+    // ================== ЦИТАТЫ ==================
 
     /**
      * Экранирует HTML-спецсимволы, чтобы не сломать parseMode=HTML.
@@ -40,22 +42,35 @@ public class AnswerMethodFactory {
     }
 
     /**
-     * Строит цитату предыдущего сообщения в виде HTML blockquote:
+     * Цитата для текстового сообщения через HTML blockquote:
      * <blockquote>[Имя]: текст</blockquote>
-     *
-     * @param senderName уже отформатированное имя (может содержать HTML, напр. [<b>Name</b>])
-     * @param text       исходный текст (будет экранирован)
      */
-    public static String buildQuote(String senderName, String text) {
+    public static String buildTextQuote(String senderName, String text) {
         if (!hasText(text)) {
             return "";
         }
         String safeText = escapeHtml(text);
-        if (safeText.length() > MAX_QUOTE_LENGTH) {
-            safeText = safeText.substring(0, MAX_QUOTE_LENGTH) + "…";
+        if (safeText.length() > MAX_TEXT_QUOTE_LENGTH) {
+            safeText = safeText.substring(0, MAX_TEXT_QUOTE_LENGTH) + "…";
         }
         String name = hasText(senderName) ? senderName : "[<b>Неизвестный</b>]";
         return "<blockquote>" + name + ": " + safeText + "</blockquote>\n";
+    }
+
+    /**
+     * Визуальная цитата для caption (подписи к медиа).
+     * Telegram не поддерживает blockquote в caption, поэтому используем « ».
+     */
+    public static String buildMediaQuote(String senderName, String text) {
+        if (!hasText(text)) {
+            return "";
+        }
+        String safeText = escapeHtml(text);
+        if (safeText.length() > MAX_MEDIA_QUOTE_LENGTH) {
+            safeText = safeText.substring(0, MAX_MEDIA_QUOTE_LENGTH) + "…";
+        }
+        String name = hasText(senderName) ? senderName : "[<b>Неизвестный</b>]";
+        return "« " + name + ": " + safeText + " »\n\n";
     }
 
     // ================== SendMessage ==================
@@ -126,15 +141,16 @@ public class AnswerMethodFactory {
     // ================== SendPhoto ==================
 
     /**
-     * Фото с цитатой в caption (без Telegram reply).
+     * Фото с нативным reply (стрелочка) и caption (цитата + текст).
      */
-    public static SendPhoto getSendPhotoRedirectable(Long chatId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+    public static SendPhoto getSendPhotoRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
         return SendPhoto.builder()
                 .chatId(String.valueOf(chatId))
                 .photo(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
+                .replyParameters(buildReplyParameters(replyToMessageId))
                 .protectContent(false)
                 .build();
     }
@@ -151,27 +167,41 @@ public class AnswerMethodFactory {
 
     // ================== SendVideo ==================
 
-    public static SendVideo getSendVideoRedirectable(Long chatId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+    public static SendVideo getSendVideoRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
         return SendVideo.builder()
                 .chatId(String.valueOf(chatId))
                 .video(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
+                .replyParameters(buildReplyParameters(replyToMessageId))
                 .protectContent(false)
                 .build();
     }
 
     // ================== SendVoice ==================
 
-    public static SendVoice getSendVoiceRedirectable(Long chatId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
+    public static SendVoice getSendVoiceRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
         return SendVoice.builder()
                 .chatId(String.valueOf(chatId))
                 .voice(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
+                .replyParameters(buildReplyParameters(replyToMessageId))
                 .protectContent(false)
+                .build();
+    }
+
+    /**
+     * Вспомогательный метод: собирает ReplyParameters или null.
+     */
+    private static ReplyParameters buildReplyParameters(Integer replyToMessageId) {
+        if (replyToMessageId == null) {
+            return null;
+        }
+        return ReplyParameters.builder()
+                .messageId(replyToMessageId)
                 .build();
     }
 

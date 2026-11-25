@@ -96,10 +96,16 @@ public class SenderService implements AdminNotifier {
                 sentMessage = telegramClient.execute(sendVoice);
 
             } else if (original.hasText()) {
-                // Ваш старый метод для текста
-                SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
-                        original.getChatId(), replyToMsgId, newText, null);
-                sentMessage = telegramClient.execute(sendMessage);
+                //если предыдущее сообщение имеет file id то отправляем как раньше с replyToMsgId
+                MessageContext message = messageRepository.findMessageContextByMessageId(replyToMsgId);
+                if (message != null && message.getFileId() != null) {
+                    // Этот метод нужно использовать если есть картинка или видео
+                    SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                            original.getChatId(), replyToMsgId, newText, null);
+                    sentMessage = telegramClient.execute(sendMessage);
+                } else {
+
+                }
             }
 
             // --- СОХРАНЕНИЕ В MAP ---

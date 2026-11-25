@@ -25,14 +25,10 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class AnswerMethodFactory {
 
-    private static final int MAX_TEXT_QUOTE_LENGTH = 300;
-    private static final int MAX_MEDIA_QUOTE_LENGTH = 150;
+    private static final int MAX_QUOTE_LENGTH = 300;
 
-    // ================== ЦИТАТЫ ==================
+    // ================== ЦИТАТА ДЛЯ ТЕКСТА ==================
 
-    /**
-     * Экранирует HTML-спецсимволы, чтобы не сломать parseMode=HTML.
-     */
     public static String escapeHtml(String text) {
         if (text == null) return "";
         return text
@@ -41,35 +37,27 @@ public class AnswerMethodFactory {
                 .replace(">", "&gt;");
     }
 
-    /**
-     * Цитата для текстового сообщения через HTML blockquote:
-     * <blockquote>[Имя]: текст</blockquote>
-     */
     public static String buildTextQuote(String senderName, String text) {
-        if (!hasText(text)) {
-            return "";
-        }
+        if (!hasText(text)) return "";
         String safeText = escapeHtml(text);
-        if (safeText.length() > MAX_TEXT_QUOTE_LENGTH) {
-            safeText = safeText.substring(0, MAX_TEXT_QUOTE_LENGTH) + "…";
+        if (safeText.length() > MAX_QUOTE_LENGTH) {
+            safeText = safeText.substring(0, MAX_QUOTE_LENGTH) + "…";
         }
         String name = hasText(senderName) ? senderName : "[<b>Неизвестный</b>]";
         return "<blockquote>" + name + ": " + safeText + "</blockquote>\n";
     }
 
-    /**
-     * Визуальная цитата для caption (подписи к медиа).
-     * Telegram не поддерживает blockquote в caption, поэтому используем « ».
-     */
+    // ================== ЦИТАТА ДЛЯ МЕДИА ==================
+    // Для медиа используем нативный реплай + визуальную цитату в подписи (без <blockquote>)
+
     public static String buildMediaQuote(String senderName, String text) {
-        if (!hasText(text)) {
-            return "";
-        }
+        if (!hasText(text)) return "";
         String safeText = escapeHtml(text);
-        if (safeText.length() > MAX_MEDIA_QUOTE_LENGTH) {
-            safeText = safeText.substring(0, MAX_MEDIA_QUOTE_LENGTH) + "…";
+        if (safeText.length() > 150) { // Подпись ограничена, оставляем место
+            safeText = safeText.substring(0, 150) + "…";
         }
         String name = hasText(senderName) ? senderName : "[<b>Неизвестный</b>]";
+        // Визуальная имитация цитаты, так как <blockquote> не работает в caption
         return "« " + name + ": " + safeText + " »\n\n";
     }
 
@@ -140,9 +128,6 @@ public class AnswerMethodFactory {
 
     // ================== SendPhoto ==================
 
-    /**
-     * Фото с нативным reply (стрелочка) и caption (цитата + текст).
-     */
     public static SendPhoto getSendPhotoRedirectable(Long chatId, Integer replyToMessageId, String fileId, String caption, ReplyKeyboardMarkup keyboard) {
         return SendPhoto.builder()
                 .chatId(String.valueOf(chatId))
@@ -193,16 +178,9 @@ public class AnswerMethodFactory {
                 .build();
     }
 
-    /**
-     * Вспомогательный метод: собирает ReplyParameters или null.
-     */
     private static ReplyParameters buildReplyParameters(Integer replyToMessageId) {
-        if (replyToMessageId == null) {
-            return null;
-        }
-        return ReplyParameters.builder()
-                .messageId(replyToMessageId)
-                .build();
+        if (replyToMessageId == null) return null;
+        return ReplyParameters.builder().messageId(replyToMessageId).build();
     }
 
     // ================== SendMediaGroup ==================
@@ -214,23 +192,19 @@ public class AnswerMethodFactory {
 
         if (photoIds != null && !photoIds.isEmpty()) {
             for (String photoId : photoIds) {
-                media.add(InputMediaPhoto.builder()
-                        .media(photoId)
-                        .build());
+                media.add(InputMediaPhoto.builder().media(photoId).build());
             }
         }
 
         if (videoIds != null && !videoIds.isEmpty()) {
             for (String videoId : videoIds) {
-                media.add(InputMediaVideo.builder()
-                        .media(videoId)
-                        .build());
+                media.add(InputMediaVideo.builder().media(videoId).build());
             }
         }
 
         if (!media.isEmpty() && hasText(caption)) {
             media.get(0).setCaption(caption);
-            media.get(0).setParseMode(ParseMode.HTML);
+            media.get(0).setParseMode("HTML");
         }
 
         return SendMediaGroup.builder()
@@ -250,7 +224,7 @@ public class AnswerMethodFactory {
     }
 
     public static DeleteMessage getDeleteMessage(Update update) {
-        if (update == null || !update.hasMessage()) {
+        if (!update.hasMessage()) {
             return null;
         }
         Integer messageId = update.getMessage().getMessageId();
@@ -264,8 +238,6 @@ public class AnswerMethodFactory {
                 .messageId(messageId)
                 .build();
     }
-
-    // ================== AnswerCallbackQuery ==================
 
     public static AnswerCallbackQuery getAnswerCallbackQuery(String callbackQueryId, String text) {
         return AnswerCallbackQuery.builder()

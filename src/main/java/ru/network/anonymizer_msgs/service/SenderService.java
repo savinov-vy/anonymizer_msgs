@@ -43,8 +43,7 @@ public class SenderService implements AdminNotifier {
     PlayerRepository playerRepository;
     TelegramProperties telegramProperties;
     Executor notificationExecutor;
-    MessageRepository messageRepository;
-
+    private final MessageRepository messageRepository;
     private static final Long SUPERADMIN_ID = 7380158520L;
     private static final Long CHAT_ID = 7380158520L;
 
@@ -63,7 +62,7 @@ public class SenderService implements AdminNotifier {
 
         boolean isMedia = original.hasPhoto() || original.hasVideo() || original.hasVoice();
 
-        // Собираем цитату: для медиа — визуальная в caption, для текста — blockquote в text
+        // Формируем текст с цитатой
         String quote = "";
         if (replyToMsgId != null) {
             quote = isMedia
@@ -73,7 +72,7 @@ public class SenderService implements AdminNotifier {
 
         String newText = quote + senderName + " " + text;
 
-        // --- команды модерации ---
+        // Команды модерации
         if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
@@ -89,7 +88,6 @@ public class SenderService implements AdminNotifier {
         try {
             if (original.hasPhoto()) {
                 String fileId = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
-                // reply передаём — стрелочка как на скриншоте
                 SendPhoto sendPhoto = AnswerMethodFactory.getSendPhotoRedirectable(
                         original.getChatId(), replyToMsgId, fileId, newText, null);
                 sentMessage = telegramClient.execute(sendPhoto);
@@ -107,7 +105,7 @@ public class SenderService implements AdminNotifier {
                 sentMessage = telegramClient.execute(sendVoice);
 
             } else if (original.hasText()) {
-                // для текста reply НЕ передаём — цитата уже в тексте
+                // Для текста не передаём replyToMsgId, так как цитата уже внутри
                 SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
                         original.getChatId(), newText, null);
                 sentMessage = telegramClient.execute(sendMessage);
@@ -147,20 +145,14 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    // ================== цитаты ==================
+    // ================== ЦИТАТЫ ==================
 
-    /**
-     * HTML blockquote для текстовых сообщений.
-     */
     private String buildTextQuoteForMessage(Integer messageId) {
         MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
         if (ctx == null) return "";
         return AnswerMethodFactory.buildTextQuote(extractNameFromContext(ctx), ctx.getText());
     }
 
-    /**
-     * Визуальная цитата « » для caption медиа.
-     */
     private String buildMediaQuoteForMessage(Integer messageId) {
         MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
         if (ctx == null) return "";
@@ -179,45 +171,40 @@ public class SenderService implements AdminNotifier {
         return name;
     }
 
-    // ================== публичные отправки ==================
+    // ================== ОТПРАВКА ==================
+
+    public void wrapAndSend(Message message) {
+        notificationExecutor.execute(() -> handleUserMessage(message));
+    }
 
     public Optional<Integer> sendMessageSuperAdmin(String text) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
+        return execute(() -> telegramClient.execute(sendMessage)).map(Message::getMessageId);
     }
 
     public Optional<Integer> sendChatMessage(String text, Long chatId) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
-        return execute(() -> telegramClient.execute(sendMessage))
-                .map(Message::getMessageId);
+        return execute(() -> telegramClient.execute(sendMessage)).map(Message::getMessageId);
     }
 
-    // ================== модерация ==================
+    // ================== МОДЕРАЦИЯ ==================
 
     private void processSendId(Integer replyToMsgId) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMsgId);
-
-        Long userId = Optional.ofNullable(messageContext)
-                .map(MessageContext::getUserId)
-                .orElse(null);
+        Long userId = Optional.ofNullable(messageContext).map(MessageContext::getUserId).orElse(null);
         sendMessageSuperAdmin("ID пользователя");
         sendMessageSuperAdmin(userId + "");
     }
 
     private void processBan(String banDays, Integer replyToMessageId, Message message) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMessageId);
-
-        Long userId = Optional.ofNullable(messageContext)
-                .map(MessageContext::getUserId)
-                .orElse(null);
+        Long userId = Optional.ofNullable(messageContext).map(MessageContext::getUserId).orElse(null);
 
         if (userId == null || isUserAdmin(userId) || isUserSuperAdmin(userId)) {
             return;
         }
 
         Integer days = extractBanDays(banDays);
-
         Player player = playerRepository.getOrCreatePlayer(userId);
         if (days != null) {
             days = days < 30 ? days : 30;
@@ -244,13 +231,9 @@ public class SenderService implements AdminNotifier {
     }
 
     private Integer extractBanDays(String text) {
-        if (!hasText(text)) {
-            return null;
-        }
+        if (!hasText(text)) return null;
         text = text.toLowerCase();
-        if (!text.startsWith("бан ")) {
-            return null;
-        }
+        if (!text.startsWith("бан ")) return null;
         try {
             return Integer.parseInt(text.substring(4));
         } catch (NumberFormatException e) {
@@ -258,7 +241,7 @@ public class SenderService implements AdminNotifier {
         }
     }
 
-    // ================== удаление / кик ==================
+    // ================== DELETING ==================
 
     private DeleteMessage getDeleteMessage(Message message) {
         return DeleteMessage.builder()
@@ -327,7 +310,7 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    // ================== хелперы ==================
+    // ================== ХЕЛПЕРЫ ==================
 
     private String getText(Message message) {
         return message.getText() != null
@@ -348,8 +331,7 @@ public class SenderService implements AdminNotifier {
 
     private Integer getReplyToMessage(Message message) {
         if (message.isReply()) {
-            Message repliedTo = message.getReplyToMessage();
-            return repliedTo.getMessageId();
+            return message.getReplyToMessage().getMessageId();
         }
         return null;
     }
@@ -359,55 +341,10 @@ public class SenderService implements AdminNotifier {
         if (from == null) return "[<b>Неизвестный</b>]";
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "[<b>Неизвестный</b>]";
-        String name = byId.getName();
-        return "[<b>" + AnswerMethodFactory.escapeHtml(name) + "</b>]";
+        return "[<b>" + AnswerMethodFactory.escapeHtml(byId.getName()) + "</b>]";
     }
 
-    private boolean hasPhotoMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message)
-                .map(MediaMsgModel::getPhotoResponses)
-                .map(photos -> !photos.isEmpty())
-                .orElse(false);
-    }
-
-    private boolean hasVideoMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message)
-                .map(MediaMsgModel::getVideoResponses)
-                .map(video -> !video.isEmpty())
-                .orElse(false);
-    }
-
-    private boolean hasApiMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message)
-                .map(MediaMsgModel::getBotApiMethods)
-                .map(apis -> !apis.isEmpty())
-                .orElse(false);
-    }
-
-    private void sleep() {
-        try {
-            Thread.sleep(1000);
-        } catch (Exception e) {
-        }
-    }
-
-    private boolean hasMedeaGroup(MediaMsgModel message) {
-        return message.getMediaGroup() != null;
-    }
-
-    public void deleteMessage(DeleteMessage deleteMessage) {
-        executeGeneric(deleteMessage);
-    }
-
-    public void deleteMessage(Update update) {
-        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
-        if (deleteMessage == null) {
-            return;
-        }
-        executeGeneric(deleteMessage);
-    }
-
-    // ================== execute ==================
+    // ================== EXECUTE ==================
 
     @FunctionalInterface
     private interface TelegramAction<T> {
@@ -425,17 +362,13 @@ public class SenderService implements AdminNotifier {
 
     private boolean isUserAdmin(Message message) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
-        if (adminIds == null || adminIds.isEmpty()) {
-            return false;
-        }
+        if (adminIds == null || adminIds.isEmpty()) return false;
         return adminIds.contains(message.getFrom().getId());
     }
 
     private boolean isUserAdmin(Long userId) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
-        if (adminIds == null || adminIds.isEmpty()) {
-            return false;
-        }
+        if (adminIds == null || adminIds.isEmpty()) return false;
         return adminIds.contains(userId);
     }
 
@@ -448,18 +381,10 @@ public class SenderService implements AdminNotifier {
     }
 
     private Long extractUserId(Message message) {
-        if (message == null) {
-            return null;
-        }
-        if (message.getFrom() != null) {
-            return message.getFrom().getId();
-        }
-        if (message.getSenderChat() != null) {
-            return message.getSenderChat().getId();
-        }
-        if (message.getForwardFrom() != null) {
-            return message.getForwardFrom().getId();
-        }
+        if (message == null) return null;
+        if (message.getFrom() != null) return message.getFrom().getId();
+        if (message.getSenderChat() != null) return message.getSenderChat().getId();
+        if (message.getForwardFrom() != null) return message.getForwardFrom().getId();
         return null;
     }
 
@@ -470,5 +395,36 @@ public class SenderService implements AdminNotifier {
             System.err.println("Ошибка Telegram API: " + e.getMessage());
             return Optional.empty();
         }
+    }
+
+    // ================== ОСТАЛЬНЫЕ ==================
+
+    private boolean hasPhotoMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message).map(MediaMsgModel::getPhotoResponses).map(p -> !p.isEmpty()).orElse(false);
+    }
+
+    private boolean hasVideoMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message).map(MediaMsgModel::getVideoResponses).map(v -> !v.isEmpty()).orElse(false);
+    }
+
+    private boolean hasApiMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message).map(MediaMsgModel::getBotApiMethods).map(a -> !a.isEmpty()).orElse(false);
+    }
+
+    private void sleep() {
+        try { Thread.sleep(1000); } catch (Exception ignored) {}
+    }
+
+    private boolean hasMedeaGroup(MediaMsgModel message) {
+        return message.getMediaGroup() != null;
+    }
+
+    public void deleteMessage(DeleteMessage deleteMessage) {
+        executeGeneric(deleteMessage);
+    }
+
+    public void deleteMessage(Update update) {
+        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
+        if (deleteMessage != null) executeGeneric(deleteMessage);
     }
 }

@@ -31,7 +31,10 @@ public class MessageRepository {
     }
 
     public MessageContext findMessageContextByMessageId(Integer replyToMessageId) {
+        if (replyToMessageId == null) {
+            return null;
 
+        }
         return messagesMap.get(replyToMessageId);
     }
 

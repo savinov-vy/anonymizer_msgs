@@ -47,6 +47,7 @@ public class SenderService implements AdminNotifier {
     private static final Long SUPERADMIN_ID = 7380158520L;
     private static final Long CHAT_ID = 7380158520L;
 
+
     public void handleUserMessage(Message original) {
         Long userId = extractUserId(original);
         Player player = playerRepository.getOrCreatePlayer(userId);
@@ -58,21 +59,10 @@ public class SenderService implements AdminNotifier {
 
         String text = getText(original);
         String senderName = buildSenderName(original);
+        String newText = senderName + " " + text;
+        // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
 
-        boolean isMedia = original.hasPhoto() || original.hasVideo() || original.hasVoice();
-
-        // Формируем текст с цитатой
-        String quote = "";
-        if (replyToMsgId != null) {
-            quote = isMedia
-                    ? buildMediaQuoteForMessage(replyToMsgId)
-                    : buildTextQuoteForMessage(replyToMsgId);
-        }
-
-        String newText = quote + senderName + " " + text;
-
-        // Команды модерации
         if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
@@ -86,6 +76,7 @@ public class SenderService implements AdminNotifier {
         Message sentMessage = null;
 
         try {
+            // --- ЛОГИКА ОПРЕДЕЛЕНИЯ ТИПА ---
             if (original.hasPhoto()) {
                 String fileId = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
                 SendPhoto sendPhoto = AnswerMethodFactory.getSendPhotoRedirectable(
@@ -105,13 +96,28 @@ public class SenderService implements AdminNotifier {
                 sentMessage = telegramClient.execute(sendVoice);
 
             } else if (original.hasText()) {
-                // Для текста не передаём replyToMsgId, так как цитата уже внутри
-                SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
-                        original.getChatId(), newText, null);
-                sentMessage = telegramClient.execute(sendMessage);
+                //если предыдущее сообщение имеет file id то отправляем как раньше с replyToMsgId
+                MessageContext message = messageRepository.findMessageContextByMessageId(replyToMsgId);
+                if (message != null && message.getFileId() != null) {
+                    // Этот метод нужно использовать если есть картинка или видео
+                    SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                            original.getChatId(), replyToMsgId, newText, null);
+                    sentMessage = telegramClient.execute(sendMessage);
+                } else {
+                    String quote = "";
+                    if (replyToMsgId != null) {
+                        quote = buildQuoteForMessage(replyToMsgId);
+                    }
+                    newText = quote + senderName + " " + text;
+                    SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                            original.getChatId(), newText, null);
+                    sentMessage = telegramClient.execute(sendMessage);
+                }
             }
 
+            // --- СОХРАНЕНИЕ В MAP ---
             if (sentMessage != null) {
+                // Определяем fileId для сохранения (если это медиа)
                 String fileIdToSave = null;
                 if (original.hasPhoto())
                     fileIdToSave = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
@@ -131,10 +137,12 @@ public class SenderService implements AdminNotifier {
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при отправке сообщения", e);
-            return;
+            return; // Прерываем, чтобы не удалять оригинал
         }
 
+        // --- УДАЛЕНИЕ ОРИГИНАЛА ---
         DeleteMessage deleteMessage = getDeleteMessage(original);
+
         execute(() -> {
             try {
                 telegramClient.execute(deleteMessage);
@@ -145,66 +153,48 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    // ================== ЦИТАТЫ ==================
-
-    private String buildTextQuoteForMessage(Integer messageId) {
-        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
-        if (ctx == null) return "";
-        return AnswerMethodFactory.buildTextQuote(extractNameFromContext(ctx), ctx.getText());
-    }
-
-    private String buildMediaQuoteForMessage(Integer messageId) {
-        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
-        if (ctx == null) return "";
-        return AnswerMethodFactory.buildMediaQuote(extractNameFromContext(ctx), ctx.getText());
-    }
-
-    private String extractNameFromContext(MessageContext ctx) {
-        String name = "[<b>Неизвестный</b>]";
-        Long userId = ctx.getUserId();
-        if (userId != null) {
-            Player p = playerRepository.getOrCreatePlayer(userId);
-            if (p != null && hasText(p.getName())) {
-                name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
-            }
-        }
-        return name;
-    }
-
-    // ================== ОТПРАВКА ==================
-
     public void wrapAndSend(Message message) {
         notificationExecutor.execute(() -> handleUserMessage(message));
     }
 
+    /**
+     * Отправляет сообщение и возвращает messageId.
+     */
     public Optional<Integer> sendMessageSuperAdmin(String text) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
-        return execute(() -> telegramClient.execute(sendMessage)).map(Message::getMessageId);
+        return execute(() -> telegramClient.execute(sendMessage))
+                .map(Message::getMessageId);
     }
 
     public Optional<Integer> sendChatMessage(String text, Long chatId) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(chatId, text, null);
-        return execute(() -> telegramClient.execute(sendMessage)).map(Message::getMessageId);
+        return execute(() -> telegramClient.execute(sendMessage))
+                .map(Message::getMessageId);
     }
-
-    // ================== МОДЕРАЦИЯ ==================
 
     private void processSendId(Integer replyToMsgId) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMsgId);
-        Long userId = Optional.ofNullable(messageContext).map(MessageContext::getUserId).orElse(null);
+
+        Long userId = Optional.ofNullable(messageContext)
+                .map(MessageContext::getUserId)
+                .orElse(null);
         sendMessageSuperAdmin("ID пользователя");
         sendMessageSuperAdmin(userId + "");
     }
 
     private void processBan(String banDays, Integer replyToMessageId, Message message) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMessageId);
-        Long userId = Optional.ofNullable(messageContext).map(MessageContext::getUserId).orElse(null);
+
+        Long userId = Optional.ofNullable(messageContext)
+                .map(MessageContext::getUserId)
+                .orElse(null);
 
         if (userId == null || isUserAdmin(userId) || isUserSuperAdmin(userId)) {
             return;
         }
 
         Integer days = extractBanDays(banDays);
+
         Player player = playerRepository.getOrCreatePlayer(userId);
         if (days != null) {
             days = days < 30 ? days : 30;
@@ -231,17 +221,19 @@ public class SenderService implements AdminNotifier {
     }
 
     private Integer extractBanDays(String text) {
-        if (!hasText(text)) return null;
+        if (!hasText(text)) {
+            return null; // просто "бан" или вообще не бан
+        }
         text = text.toLowerCase();
-        if (!text.startsWith("бан ")) return null;
+        if (!text.startsWith("бан ")) {
+            return null;
+        }
         try {
-            return Integer.parseInt(text.substring(4));
+            return Integer.parseInt(text.substring(4)); // после "бан "
         } catch (NumberFormatException e) {
             return null;
         }
     }
-
-    // ================== DELETING ==================
 
     private DeleteMessage getDeleteMessage(Message message) {
         return DeleteMessage.builder()
@@ -270,7 +262,7 @@ public class SenderService implements AdminNotifier {
         UnbanChatMember unbanChatMember = UnbanChatMember.builder()
                 .chatId(String.valueOf(chatId))
                 .userId(userId)
-                .onlyIfBanned(true)
+                .onlyIfBanned(true) // снимет бан, но не вернет в чат принудительно
                 .build();
 
         execute(() -> {
@@ -283,6 +275,7 @@ public class SenderService implements AdminNotifier {
             return null;
         });
     }
+
 
     private void executeKickUser(Message message) {
         Long userId = message.getFrom().getId();
@@ -310,7 +303,6 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    // ================== ХЕЛПЕРЫ ==================
 
     private String getText(Message message) {
         return message.getText() != null
@@ -329,9 +321,12 @@ public class SenderService implements AdminNotifier {
                 .orElse(false);
     }
 
+
     private Integer getReplyToMessage(Message message) {
         if (message.isReply()) {
-            return message.getReplyToMessage().getMessageId();
+            Message repliedTo = message.getReplyToMessage();
+
+            return repliedTo.getMessageId();
         }
         return null;
     }
@@ -341,16 +336,68 @@ public class SenderService implements AdminNotifier {
         if (from == null) return "[<b>Неизвестный</b>]";
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "[<b>Неизвестный</b>]";
-        return "[<b>" + AnswerMethodFactory.escapeHtml(byId.getName()) + "</b>]";
+        String name = byId.getName();
+        return "[<b>" + name + "</b>]";
     }
 
-    // ================== EXECUTE ==================
+    // ================== вспомогательное ==================
+
+    private boolean hasPhotoMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message)
+                .map(MediaMsgModel::getPhotoResponses)
+                .map(photos -> !photos.isEmpty())
+                .orElse(false);
+    }
+
+    private boolean hasVideoMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message)
+                .map(MediaMsgModel::getVideoResponses)
+                .map(video -> !video.isEmpty())
+                .orElse(false);
+    }
+
+    private boolean hasApiMsg(MediaMsgModel message) {
+        return Optional.ofNullable(message)
+                .map(MediaMsgModel::getBotApiMethods)
+                .map(apis -> !apis.isEmpty())
+                .orElse(false);
+    }
+
+    private void sleep() {
+        try {
+            Thread.sleep(1000);
+        } catch (Exception e) {
+        }
+    }
+
+
+    private boolean hasMedeaGroup(MediaMsgModel message) {
+        return message.getMediaGroup() != null;
+    }
+
+
+    public void deleteMessage(DeleteMessage deleteMessage) {
+        executeGeneric(deleteMessage);
+    }
+
+    public void deleteMessage(Update update) {
+        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
+        if (deleteMessage == null) {
+            return;
+        }
+        executeGeneric(deleteMessage);
+    }
+    // ================== execute ==================
 
     @FunctionalInterface
     private interface TelegramAction<T> {
         T run() throws TelegramApiException;
     }
 
+    /**
+     * Выполняет действие и возвращает результат, если он есть.
+     * Ошибки логируются и превращаются в Optional.empty().
+     */
     private <T> Optional<T> execute(TelegramAction<T> action) {
         try {
             return Optional.ofNullable(action.run());
@@ -362,13 +409,17 @@ public class SenderService implements AdminNotifier {
 
     private boolean isUserAdmin(Message message) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
-        if (adminIds == null || adminIds.isEmpty()) return false;
+        if (adminIds == null || adminIds.isEmpty()) {
+            return false;
+        }
         return adminIds.contains(message.getFrom().getId());
     }
 
     private boolean isUserAdmin(Long userId) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
-        if (adminIds == null || adminIds.isEmpty()) return false;
+        if (adminIds == null || adminIds.isEmpty()) {
+            return false;
+        }
         return adminIds.contains(userId);
     }
 
@@ -380,14 +431,61 @@ public class SenderService implements AdminNotifier {
         return SUPERADMIN_ID.equals(message.getFrom().getId());
     }
 
+    /**
+     * Извлекает ID пользователя из сообщения.
+     * @return ID пользователя или null, если отправитель не определен.
+     */
     private Long extractUserId(Message message) {
-        if (message == null) return null;
-        if (message.getFrom() != null) return message.getFrom().getId();
-        if (message.getSenderChat() != null) return message.getSenderChat().getId();
-        if (message.getForwardFrom() != null) return message.getForwardFrom().getId();
+        if (message == null) {
+            return null;
+        }
+
+        // 1. Стандартный случай: сообщение от пользователя (или бота)
+        if (message.getFrom() != null) {
+            return message.getFrom().getId();
+        }
+
+        // 2. Сообщение от анонимного администратора или канала
+        if (message.getSenderChat() != null) {
+            return message.getSenderChat().getId();
+        }
+
+        // 3. Fallback: если это пересланное сообщение, можно взять отправителя оттуда
+        // (хотя обычно getFrom() уже содержит данные)
+        if (message.getForwardFrom() != null) {
+            return message.getForwardFrom().getId();
+        }
+
+        // 4. Если ничего не подошло
         return null;
     }
 
+    /**
+     * Строит цитату по messageId ранее переотправленного сообщения.
+     * Имя берём из Player, текст — из MessageContext.
+     */
+    private String buildQuoteForMessage(Integer messageId) {
+        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
+        if (ctx == null) {
+            return "";
+        }
+
+        String name = "[<b>Неизвестный</b>]";
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            Player p = playerRepository.getOrCreatePlayer(userId);
+            if (p != null && hasText(p.getName())) {
+                name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
+            }
+        }
+
+        String originalText = ctx.getText();
+        return AnswerMethodFactory.buildQuote(name, originalText);
+    }
+
+    /**
+     * Обёртка для BotApiMethod с неизвестным типом (wildcard).
+     */
     private Optional<?> executeGeneric(BotApiMethod<?> method) {
         try {
             return Optional.ofNullable(telegramClient.execute(method));
@@ -395,36 +493,5 @@ public class SenderService implements AdminNotifier {
             System.err.println("Ошибка Telegram API: " + e.getMessage());
             return Optional.empty();
         }
-    }
-
-    // ================== ОСТАЛЬНЫЕ ==================
-
-    private boolean hasPhotoMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message).map(MediaMsgModel::getPhotoResponses).map(p -> !p.isEmpty()).orElse(false);
-    }
-
-    private boolean hasVideoMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message).map(MediaMsgModel::getVideoResponses).map(v -> !v.isEmpty()).orElse(false);
-    }
-
-    private boolean hasApiMsg(MediaMsgModel message) {
-        return Optional.ofNullable(message).map(MediaMsgModel::getBotApiMethods).map(a -> !a.isEmpty()).orElse(false);
-    }
-
-    private void sleep() {
-        try { Thread.sleep(1000); } catch (Exception ignored) {}
-    }
-
-    private boolean hasMedeaGroup(MediaMsgModel message) {
-        return message.getMediaGroup() != null;
-    }
-
-    public void deleteMessage(DeleteMessage deleteMessage) {
-        executeGeneric(deleteMessage);
-    }
-
-    public void deleteMessage(Update update) {
-        DeleteMessage deleteMessage = AnswerMethodFactory.getDeleteMessage(update);
-        if (deleteMessage != null) executeGeneric(deleteMessage);
     }
 }

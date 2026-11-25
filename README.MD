@@ -1,5 +1,5 @@
-docker build -t vysavinov/wrapper:0.0.1 .
-docker push vysavinov/wrapper:0.0.1
+docker build -t vysavinov/wrapper:1.0.0 .
+docker push vysavinov/wrapper:1.0.0
 
 
 root@nl-vmmini:~# cd ../bot_network

@@ -43,10 +43,10 @@ public class SenderService implements AdminNotifier {
     PlayerRepository playerRepository;
     TelegramProperties telegramProperties;
     Executor notificationExecutor;
-    private final MessageRepository messageRepository;
+    MessageRepository messageRepository;
+
     private static final Long SUPERADMIN_ID = 7380158520L;
     private static final Long CHAT_ID = 7380158520L;
-
 
     public void handleUserMessage(Message original) {
         Long userId = extractUserId(original);
@@ -59,9 +59,11 @@ public class SenderService implements AdminNotifier {
 
         String text = getText(original);
         String senderName = buildSenderName(original);
-        String newText = senderName + " " + text;
-        // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
+
+        // --- ЦИТАТА ВМЕСТО НАТИВНОГО REPLY ---
+        String quote = (replyToMsgId != null) ? buildQuoteForMessage(replyToMsgId) : "";
+        String newText = quote + senderName + " " + text;
 
         if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
             processBan(text, replyToMsgId, original);
@@ -76,35 +78,31 @@ public class SenderService implements AdminNotifier {
         Message sentMessage = null;
 
         try {
-            // --- ЛОГИКА ОПРЕДЕЛЕНИЯ ТИПА ---
             if (original.hasPhoto()) {
                 String fileId = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
                 SendPhoto sendPhoto = AnswerMethodFactory.getSendPhotoRedirectable(
-                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                        original.getChatId(), fileId, newText, null);
                 sentMessage = telegramClient.execute(sendPhoto);
 
             } else if (original.hasVideo()) {
                 String fileId = original.getVideo().getFileId();
                 SendVideo sendVideo = AnswerMethodFactory.getSendVideoRedirectable(
-                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                        original.getChatId(), fileId, newText, null);
                 sentMessage = telegramClient.execute(sendVideo);
 
             } else if (original.hasVoice()) {
                 String fileId = original.getVoice().getFileId();
                 SendVoice sendVoice = AnswerMethodFactory.getSendVoiceRedirectable(
-                        original.getChatId(), replyToMsgId, fileId, newText, null);
+                        original.getChatId(), fileId, newText, null);
                 sentMessage = telegramClient.execute(sendVoice);
 
             } else if (original.hasText()) {
-                // Ваш старый метод для текста
                 SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
-                        original.getChatId(), replyToMsgId, newText, null);
+                        original.getChatId(), newText, null);
                 sentMessage = telegramClient.execute(sendMessage);
             }
 
-            // --- СОХРАНЕНИЕ В MAP ---
             if (sentMessage != null) {
-                // Определяем fileId для сохранения (если это медиа)
                 String fileIdToSave = null;
                 if (original.hasPhoto())
                     fileIdToSave = original.getPhoto().get(original.getPhoto().size() - 1).getFileId();
@@ -124,12 +122,10 @@ public class SenderService implements AdminNotifier {
 
         } catch (TelegramApiException e) {
             log.error("Ошибка при отправке сообщения", e);
-            return; // Прерываем, чтобы не удалять оригинал
+            return;
         }
 
-        // --- УДАЛЕНИЕ ОРИГИНАЛА ---
         DeleteMessage deleteMessage = getDeleteMessage(original);
-
         execute(() -> {
             try {
                 telegramClient.execute(deleteMessage);
@@ -140,13 +136,29 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-    public void wrapAndSend(Message message) {
-        notificationExecutor.execute(() -> handleUserMessage(message));
+    /**
+     * Строит цитату по messageId ранее переотправленного сообщения.
+     * Имя берём из Player, текст — из MessageContext.
+     */
+    private String buildQuoteForMessage(Integer messageId) {
+        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
+        if (ctx == null) {
+            return "";
+        }
+
+        String name = "[<b>Неизвестный</b>]";
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            Player p = playerRepository.getOrCreatePlayer(userId);
+            if (p != null && hasText(p.getName())) {
+                name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
+            }
+        }
+
+        String originalText = ctx.getText();
+        return AnswerMethodFactory.buildQuote(name, originalText);
     }
 
-    /**
-     * Отправляет сообщение и возвращает messageId.
-     */
     public Optional<Integer> sendMessageSuperAdmin(String text) {
         SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(SUPERADMIN_ID, text, null);
         return execute(() -> telegramClient.execute(sendMessage))
@@ -209,14 +221,14 @@ public class SenderService implements AdminNotifier {
 
     private Integer extractBanDays(String text) {
         if (!hasText(text)) {
-            return null; // просто "бан" или вообще не бан
+            return null;
         }
         text = text.toLowerCase();
         if (!text.startsWith("бан ")) {
             return null;
         }
         try {
-            return Integer.parseInt(text.substring(4)); // после "бан "
+            return Integer.parseInt(text.substring(4));
         } catch (NumberFormatException e) {
             return null;
         }
@@ -249,7 +261,7 @@ public class SenderService implements AdminNotifier {
         UnbanChatMember unbanChatMember = UnbanChatMember.builder()
                 .chatId(String.valueOf(chatId))
                 .userId(userId)
-                .onlyIfBanned(true) // снимет бан, но не вернет в чат принудительно
+                .onlyIfBanned(true)
                 .build();
 
         execute(() -> {
@@ -262,7 +274,6 @@ public class SenderService implements AdminNotifier {
             return null;
         });
     }
-
 
     private void executeKickUser(Message message) {
         Long userId = message.getFrom().getId();
@@ -290,7 +301,6 @@ public class SenderService implements AdminNotifier {
         });
     }
 
-
     private String getText(Message message) {
         return message.getText() != null
                 ? message.getText()
@@ -308,11 +318,9 @@ public class SenderService implements AdminNotifier {
                 .orElse(false);
     }
 
-
     private Integer getReplyToMessage(Message message) {
         if (message.isReply()) {
             Message repliedTo = message.getReplyToMessage();
-
             return repliedTo.getMessageId();
         }
         return null;
@@ -324,7 +332,7 @@ public class SenderService implements AdminNotifier {
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "[<b>Неизвестный</b>]";
         String name = byId.getName();
-        return "[<b>" + name + "</b>]";
+        return "[<b>" + AnswerMethodFactory.escapeHtml(name) + "</b>]";
     }
 
     // ================== вспомогательное ==================
@@ -357,11 +365,9 @@ public class SenderService implements AdminNotifier {
         }
     }
 
-
     private boolean hasMedeaGroup(MediaMsgModel message) {
         return message.getMediaGroup() != null;
     }
-
 
     public void deleteMessage(DeleteMessage deleteMessage) {
         executeGeneric(deleteMessage);
@@ -374,6 +380,7 @@ public class SenderService implements AdminNotifier {
         }
         executeGeneric(deleteMessage);
     }
+
     // ================== execute ==================
 
     @FunctionalInterface
@@ -381,10 +388,6 @@ public class SenderService implements AdminNotifier {
         T run() throws TelegramApiException;
     }
 
-    /**
-     * Выполняет действие и возвращает результат, если он есть.
-     * Ошибки логируются и превращаются в Optional.empty().
-     */
     private <T> Optional<T> execute(TelegramAction<T> action) {
         try {
             return Optional.ofNullable(action.run());
@@ -418,38 +421,22 @@ public class SenderService implements AdminNotifier {
         return SUPERADMIN_ID.equals(message.getFrom().getId());
     }
 
-    /**
-     * Извлекает ID пользователя из сообщения.
-     * @return ID пользователя или null, если отправитель не определен.
-     */
     private Long extractUserId(Message message) {
         if (message == null) {
             return null;
         }
-
-        // 1. Стандартный случай: сообщение от пользователя (или бота)
         if (message.getFrom() != null) {
             return message.getFrom().getId();
         }
-
-        // 2. Сообщение от анонимного администратора или канала
         if (message.getSenderChat() != null) {
             return message.getSenderChat().getId();
         }
-
-        // 3. Fallback: если это пересланное сообщение, можно взять отправителя оттуда
-        // (хотя обычно getFrom() уже содержит данные)
         if (message.getForwardFrom() != null) {
             return message.getForwardFrom().getId();
         }
-
-        // 4. Если ничего не подошло
         return null;
     }
 
-    /**
-     * Обёртка для BotApiMethod с неизвестным типом (wildcard).
-     */
     private Optional<?> executeGeneric(BotApiMethod<?> method) {
         try {
             return Optional.ofNullable(telegramClient.execute(method));

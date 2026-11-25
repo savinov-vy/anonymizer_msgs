@@ -16,6 +16,6 @@ FROM eclipse-temurin:21-jre-jammy
 
 RUN mkdir -p /home/service
 
-COPY --from=build-container /home/service/target/wrapper-0.0.1.jar /home/service
+COPY --from=build-container /home/service/target/wrapper-1.0.0.jar /home/service
 
-CMD ["java", "-jar", "/home/service/wrapper-0.0.1.jar"]
+CMD ["java", "-jar", "/home/service/wrapper-1.0.0.jar"]

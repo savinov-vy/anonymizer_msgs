@@ -337,7 +337,7 @@ public class SenderService implements AdminNotifier {
         Player byId = playerRepository.getOrCreatePlayer(from.getId());
         if (byId == null) return "[<b>Неизвестный</b>]";
         String name = byId.getName();
-        return "[<b>" + name + "</b>]";
+        return "<b>" + name + "</b>:";
     }
 
     // ================== вспомогательное ==================
@@ -470,12 +470,12 @@ public class SenderService implements AdminNotifier {
             return "";
         }
 
-        String name = "[<b>Неизвестный</b>]";
+        String name = "<b>Неизвестный</b>";
         Long userId = ctx.getUserId();
         if (userId != null) {
             Player p = playerRepository.getOrCreatePlayer(userId);
             if (p != null && hasText(p.getName())) {
-                name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
+                name = "<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>";
             }
         }
 

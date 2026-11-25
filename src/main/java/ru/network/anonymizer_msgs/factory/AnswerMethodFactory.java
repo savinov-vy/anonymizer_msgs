@@ -30,6 +30,41 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class AnswerMethodFactory {
 
+
+
+    private static final int MAX_QUOTE_LENGTH = 300;
+
+    // ================== ЦИТАТА ==================
+
+    /**
+     * Экранирует HTML-спецсимволы, чтобы не сломать parseMode=HTML.
+     */
+    public static String escapeHtml(String text) {
+        if (text == null) return "";
+        return text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    /**
+     * Строит цитату предыдущего сообщения в виде HTML blockquote:
+     * <blockquote>[Имя]: текст</blockquote>
+     *
+     * @param senderName уже отформатированное имя (может содержать HTML, напр. [<b>Name</b>])
+     * @param text       исходный текст (будет экранирован)
+     */
+    public static String buildQuote(String senderName, String text) {
+        if (!hasText(text)) {
+            return "";
+        }
+        String safeText = escapeHtml(text);
+        if (safeText.length() > MAX_QUOTE_LENGTH) {
+            safeText = safeText.substring(0, MAX_QUOTE_LENGTH) + "…";
+        }
+        String name = hasText(senderName) ? senderName : "[<b>Неизвестный</b>]";
+        return "<blockquote>" + name + ": " + safeText + "</blockquote>\n";
+    }
     /**
      * SendMessage - метод для отправки сообщения ботом пользователю
      */
@@ -44,11 +79,13 @@ public class AnswerMethodFactory {
                 .build();
     }
 
+    // Текстовый — БЕЗ replyParameters
     public static SendMessage getSendMessageRedirectable(Long chatId, String text, ReplyKeyboardMarkup keyboard) {
         return SendMessage.builder()
                 .chatId(String.valueOf(chatId))
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
+                .parseMode(ParseMode.HTML)
                 .disableWebPagePreview(true)
                 .protectContent(false)
                 .build();

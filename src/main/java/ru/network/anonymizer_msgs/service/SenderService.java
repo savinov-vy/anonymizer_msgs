@@ -104,7 +104,14 @@ public class SenderService implements AdminNotifier {
                             original.getChatId(), replyToMsgId, newText, null);
                     sentMessage = telegramClient.execute(sendMessage);
                 } else {
-
+                    String quote = "";
+                    if (replyToMsgId != null) {
+                        quote = buildQuoteForMessage(replyToMsgId);
+                    }
+                    newText = quote + senderName + " " + text;
+                    SendMessage sendMessage = AnswerMethodFactory.getSendMessageRedirectable(
+                            original.getChatId(), newText, null);
+                    sentMessage = telegramClient.execute(sendMessage);
                 }
             }
 
@@ -451,6 +458,29 @@ public class SenderService implements AdminNotifier {
 
         // 4. Если ничего не подошло
         return null;
+    }
+
+    /**
+     * Строит цитату по messageId ранее переотправленного сообщения.
+     * Имя берём из Player, текст — из MessageContext.
+     */
+    private String buildQuoteForMessage(Integer messageId) {
+        MessageContext ctx = messageRepository.findMessageContextByMessageId(messageId);
+        if (ctx == null) {
+            return "";
+        }
+
+        String name = "[<b>Неизвестный</b>]";
+        Long userId = ctx.getUserId();
+        if (userId != null) {
+            Player p = playerRepository.getOrCreatePlayer(userId);
+            if (p != null && hasText(p.getName())) {
+                name = "[<b>" + AnswerMethodFactory.escapeHtml(p.getName()) + "</b>]";
+            }
+        }
+
+        String originalText = ctx.getText();
+        return AnswerMethodFactory.buildQuote(name, originalText);
     }
 
     /**

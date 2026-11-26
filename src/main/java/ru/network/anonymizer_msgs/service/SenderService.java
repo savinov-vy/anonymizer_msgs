@@ -25,6 +25,7 @@ import ru.network.anonymizer_msgs.model.MessageContext;
 import ru.network.anonymizer_msgs.model.Player;
 import ru.network.anonymizer_msgs.repository.MessageRepository;
 import ru.network.anonymizer_msgs.repository.PlayerRepository;
+import ru.network.anonymizer_msgs.repository.UserRepository;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -43,9 +44,64 @@ public class SenderService implements AdminNotifier {
     PlayerRepository playerRepository;
     TelegramProperties telegramProperties;
     Executor notificationExecutor;
+    UserRepository userRepository;
     private final MessageRepository messageRepository;
-    private static final Long SUPERADMIN_ID = 7380158520L;
+    private static final Long SUPERADMIN_ID = 97380158520L;
     private static final Long CHAT_ID = 7380158520L;
+    private static final Set<String> LIKE_EMOJIS = Set.of(
+            // большой палец вверх (с нормализацией тона кожи)
+            "\uD83D\uDC4D",              // 👍
+            // сердца
+            "\u2764",                    // ❤
+            "\uD83E\uDDE1",              // 🧡
+            "\uD83D\uDC9B",              // 💛
+            "\uD83D\uDC9A",              // 💚
+            "\uD83D\uDC99",              // 💙
+            "\uD83D\uDC9C",              // 💜
+            "\uD83E\uDD0D",              // 🤍
+            "\uD83D\uDDA4",              // 🖤
+            "\uD83E\uDD0E",              // 🤎
+            // руки / жесты
+            "\uD83D\uDC4F",              // 👏
+            "\uD83D\uDE4C",              // 🙌
+            "\uD83E\uDD1D",              // 🤝
+            "\uD83D\uDC4C",              // 👌
+            "\u270C",                    // ✌
+            "\uD83E\uDD19",              // 🤙
+            "\uD83D\uDE4F",              // 🙏
+            "\uD83D\uDCAA",              // 💪
+            "\uD83E\uDEF6",              // 🫶
+            // улыбки одобрения
+            "\uD83D\uDE00",              // 😀
+            "\uD83D\uDE03",              // 😃
+            "\uD83D\uDE04",              // 😄
+            "\uD83D\uDE01",              // 😁
+            "\uD83D\uDE0A",              // 😊
+            "\uD83D\uDE0D",              // 😍
+            "\uD83E\uDD70",              // 🥰
+            "\uD83D\uDE0E",              // 😎
+            "\uD83E\uDD29",              // 🤩
+            "\uD83E\uDD73",              // 🥳
+            "\uD83D\uDE18",              // 😘
+            "\uD83D\uDE0B",              // 😋
+            // прочее одобрение
+            "\u2B50",                    // ⭐
+            "\uD83C\uDF1F",              // 🌟
+            "\uD83C\uDFC6",              // 🏆
+            "\uD83D\uDCAF",              // 💯
+            "\u2705",                    // ✅
+            "\uD83D\uDD25",              // 🔥
+            "\uD83C\uDF89",              // 🎉
+            "\uD83D\uDE80",              // 🚀
+            "\uD83D\uDC51",              // 👑
+            "\uD83D\uDC8E",              // 💎
+            "\uD83D\uDCC8",              // 📈
+            "\uD83C\uDD97",              // 🆗
+            "\uD83C\uDD92",
+            "❤\uFE0F"// 🆒
+    );
+
+    private static final String DISLIKE_EMOJI = "\uD83D\uDC4E";
 
 
     public void handleUserMessage(Message original) {
@@ -54,6 +110,7 @@ public class SenderService implements AdminNotifier {
 
         if (isBanned(original) || player == null) {
             executeKickUser(original);
+            executeDeleteMessage(original);
             return;
         }
 
@@ -63,12 +120,16 @@ public class SenderService implements AdminNotifier {
         // Получаем ID сообщения, на которое отвечаем (если это Reply)
         Integer replyToMsgId = getReplyToMessage(original);
 
-        if (isUserAdmin(original) && isBanText(text) && replyToMsgId != null) {
+        if (isBanText(text) && replyToMsgId != null && isUserWoman(original)) {
             processBan(text, replyToMsgId, original);
             executeDeleteMessage(original);
             return;
         } else if (isUserSuperAdmin(original) && isUserText(text) && replyToMsgId != null) {
             processSendId(replyToMsgId);
+            executeDeleteMessage(original);
+            return;
+        } else if (isLikeText(text) && replyToMsgId != null && isUserWoman(original)) {
+            processShowUsername(replyToMsgId, original);
             executeDeleteMessage(original);
             return;
         }
@@ -182,6 +243,31 @@ public class SenderService implements AdminNotifier {
         sendMessageSuperAdmin(userId + "");
     }
 
+    private void processShowUsername(Integer replyToMessageId, Message message) {
+        MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMessageId);
+
+        Long userId = Optional.ofNullable(messageContext)
+                .map(MessageContext::getUserId)
+                .orElse(null);
+
+        if (userId == null || isUserWoman(userId) || isUserAdmin(userId) || isUserSuperAdmin(userId)) {
+            return;
+        }
+
+        Player player = playerRepository.getOrCreatePlayer(userId);
+        var user = userRepository.findUserById(userId);
+
+        if (user == null || !hasText(user.getUsername())) {
+            sendChatMessage("Username не найден", message.getChatId());
+            return;
+        }
+
+        sendChatMessage(
+                String.format("Пользователь: [ %s ]\n\n username t.me/%s", player.getName(), user.getUsername()),
+                message.getChatId()
+        );
+    }
+
     private void processBan(String banDays, Integer replyToMessageId, Message message) {
         MessageContext messageContext = messageRepository.findMessageContextByMessageId(replyToMessageId);
 
@@ -211,7 +297,14 @@ public class SenderService implements AdminNotifier {
     private boolean isBanText(String text) {
         if (!hasText(text)) return false;
         text = text.toLowerCase();
-        return text.matches("бан( [1-9]\\d{0,9})?");
+        return text.matches("\uD83D\uDC4E( [1-9]\\d{0,9})?");
+    }
+
+    private boolean isLikeText(String text) {
+        if (!hasText(text)) {
+            return false;
+        }
+        return LIKE_EMOJIS.contains(text);
     }
 
     private boolean isUserText(String text) {
@@ -407,6 +500,25 @@ public class SenderService implements AdminNotifier {
         }
     }
 
+    private boolean isUserWoman(Message message) {
+        Long userId = message.getFrom().getId();
+        var user = userRepository.findUserById(userId);
+        if (user == null) {
+            return false;
+        }
+        Boolean isMan = user.getIsMan();
+        return Boolean.FALSE.equals(isMan);
+    }
+
+    private boolean isUserWoman(Long userId) {
+        var user = userRepository.findUserById(userId);
+        if (user == null) {
+            return false;
+        }
+        Boolean isMan = user.getIsMan();
+        return Boolean.FALSE.equals(isMan);
+    }
+
     private boolean isUserAdmin(Message message) {
         Set<Long> adminIds = telegramProperties.getAdminIds();
         if (adminIds == null || adminIds.isEmpty()) {
@@ -433,6 +545,7 @@ public class SenderService implements AdminNotifier {
 
     /**
      * Извлекает ID пользователя из сообщения.
+     *
      * @return ID пользователя или null, если отправитель не определен.
      */
     private Long extractUserId(Message message) {

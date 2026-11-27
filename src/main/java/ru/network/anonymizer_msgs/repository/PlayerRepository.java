@@ -1,6 +1,5 @@
 package ru.network.anonymizer_msgs.repository;
 
-import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

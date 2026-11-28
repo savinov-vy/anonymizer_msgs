@@ -8,23 +8,18 @@ import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.send.SendVideo;
 import org.telegram.telegrambots.meta.api.methods.send.SendVoice;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageText;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.ReplyParameters;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.media.InputMediaVideo;
-import org.telegram.telegrambots.meta.api.objects.message.Message;
-import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.springframework.util.StringUtils.hasText;
 
@@ -74,6 +69,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
+                .disableNotification(true)
                 .protectContent(false)
                 .parseMode(ParseMode.HTML)
                 .build();
@@ -87,6 +83,7 @@ public class AnswerMethodFactory {
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
                 .disableWebPagePreview(true)
+                .disableNotification(true)
                 .protectContent(false)
                 .build();
     }
@@ -101,6 +98,7 @@ public class AnswerMethodFactory {
                 .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
+                .disableNotification(true)
                 .build();
     }
 
@@ -112,6 +110,7 @@ public class AnswerMethodFactory {
                 .caption(caption)
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
+                .disableNotification(true)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
                 .build();
@@ -124,6 +123,7 @@ public class AnswerMethodFactory {
                 .voice(new InputFile(fileId))
                 .caption(caption)
                 .replyMarkup(keyboard)
+                .disableNotification(true)
                 .parseMode(ParseMode.HTML)
                 .replyParameters(replyToMessageId != null ? ReplyParameters.builder().messageId(replyToMessageId).build() : null)
                 .protectContent(false)
@@ -144,6 +144,7 @@ public class AnswerMethodFactory {
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
                 .parseMode(ParseMode.HTML)
+                .disableNotification(true)
                 .replyParameters(replyToMessageId != null
                         ? ReplyParameters.builder().messageId(replyToMessageId).build()
                         : null)
@@ -161,6 +162,7 @@ public class AnswerMethodFactory {
                 .chatId(String.valueOf(chatId))
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
+                .disableNotification(true)
                 .disableWebPagePreview(true)
                 .protectContent(false)
                 .build();
@@ -171,6 +173,7 @@ public class AnswerMethodFactory {
                 .chatId(String.valueOf(chatId))
                 .text(hasText(text) ? text : "\uD83D\uDE0A \uD83D\uDC4D")
                 .replyMarkup(keyboard)
+                .disableNotification(true)
                 .disableWebPagePreview(true)
                 .protectContent(false)
                 .build();
@@ -183,6 +186,7 @@ public class AnswerMethodFactory {
                 .replyMarkup(keyboard)
                 .disableWebPagePreview(true)
                 .protectContent(false)
+                .disableNotification(true)
                 .build();
     }
 
@@ -198,6 +202,7 @@ public class AnswerMethodFactory {
                         .removeKeyboard(true)
                         .build()) // передаем объект удаления
                 .disableWebPagePreview(true)
+                .disableNotification(true)
                 .build();
     }
 
@@ -211,6 +216,7 @@ public class AnswerMethodFactory {
                 .photo(new InputFile(fileId))
                 .replyMarkup(keyboard)
                 .protectContent(false)
+                .disableNotification(true)
                 .build();
     }
 

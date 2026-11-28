@@ -46,7 +46,7 @@ public class SenderService implements AdminNotifier {
     Executor notificationExecutor;
     UserRepository userRepository;
     private final MessageRepository messageRepository;
-    private static final Long SUPERADMIN_ID = 97380158520L;
+    private static final Long SUPERADMIN_ID = 7380158520L;
     private static final Long CHAT_ID = 7380158520L;
     private static final Set<String> LIKE_EMOJIS = Set.of(
             // большой палец вверх (с нормализацией тона кожи)
